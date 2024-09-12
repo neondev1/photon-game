@@ -3,7 +3,6 @@
 #include <glm/glm.hpp>
 
 #include "head.hpp"
-#include "logic.hpp"
 
 bool interact(photon* const p, double dist, object* const obj,
 	box const* const hitbox, int line, int tps, std::list<photon>::iterator* iter) {

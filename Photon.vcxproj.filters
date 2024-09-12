@@ -30,7 +30,13 @@
     <ClCompile Include="src\resources.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="loader.cpp">
+    <ClCompile Include="src\loader.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\gui.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\font.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
@@ -38,7 +44,7 @@
     <ClInclude Include="src\head.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="src\logic.hpp">
+    <ClInclude Include="src\gui.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

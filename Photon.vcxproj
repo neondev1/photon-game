@@ -150,15 +150,17 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="glad.c" />
-    <ClCompile Include="loader.cpp" />
+    <ClCompile Include="src\font.cpp" />
+    <ClCompile Include="src\gui.cpp" />
+    <ClCompile Include="src\loader.cpp" />
     <ClCompile Include="src\logic.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\object.cpp" />
     <ClCompile Include="src\resources.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\gui.hpp" />
     <ClInclude Include="src\head.hpp" />
-    <ClInclude Include="src\logic.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" />

@@ -14,11 +14,14 @@
 #define PX_SIZE 2
 #define PI 3.14159265359
 
+extern GLFWwindow* window;
+
 struct rect {
 	GLint x, y;
 	GLsizei width, height;
 	glm::vec4 colour;
 	GLfloat noise;
+	int layer;
 };
 
 struct box {
@@ -55,11 +58,13 @@ public:
 	std::vector<struct rect>* other_tex;
 	std::vector<struct box>* hitbox;
 	
+	object(void);
 	object(double x, double y, int width, int height, enum_orientation direction, enum_type type,
 		std::vector<struct rect>* tex, std::vector<struct box>* hbox);
 	
-	virtual void render(void);
-	virtual void tick(int tps);
+	void render(int layer) const;
+	void border(void) const;
+	void tick(int tps);
 	inline virtual bool on_screen(void) const { return x < 1280 / PX_SIZE && x + width > 0 && y < 720 / PX_SIZE && y + height > 0; };
 	double angle(void) const;
 	inline int midx(void) const { return x + (width / 2); }
@@ -68,7 +73,7 @@ public:
 
 class node;
 
-class photon : public object {
+class photon: public object {
 public:
 	static std::list<photon> photons;
 	static std::list<node> nodes;
@@ -94,7 +99,7 @@ public:
 	
 	photon(std::vector<struct rect>* texture, double x, double y, enum_direction dir, int dc, node* parent);
 
-	void render(void);
+	void render(void) const;
 	inline bool on_screen(void) const { return _x < 1280.0 / PX_SIZE && _x + width > 0.0 && _y < 720.0 / PX_SIZE && _y + height > 0.0; }
 	void pre_tick(int tps);
 	void tick(int tps, double len, std::list<photon>::iterator* iter);
@@ -111,9 +116,7 @@ private:
 
 class node {
 public:
-	enum class enum_node {
-		SUPERPOS, SPDC
-	};
+	enum class enum_node { SUPERPOS, SPDC };
 
 	node* parent;
 	enum_node type;
@@ -136,14 +139,32 @@ namespace res {
 		extern GLuint rectangle;
 		extern const char* vertex;
 		extern const char* fragment;
-		void init(void);
+		void load(void);
 	}
 	namespace loader {
-		extern std::vector<std::vector<box>> hitboxes;
-		extern std::vector<std::vector<rect>> textures;
-		void init(void);
+		extern std::vector<box> hitboxes[32];
+		extern std::vector<rect> textures[32];
+		extern std::vector<std::vector<object>> levels;
+		void load_tex(void);
+		void load_obj(void);
+		void load_level(int level);
 	}
-	void init_vao(void);
+	void load_vao(void);
 }
+
+namespace keybinds {
+	extern int up, left, down, right;
+	extern int ccw, cw, perp, toggle;
+}
+
+inline double distance(double x1, double y1, double x2, double y2) {
+	return sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
+}
+
+bool interact(photon* const p, double dist, object* const obj,
+	box const* const hitbox, int line, int tps, std::list<photon>::iterator* iter);
+double intersect(double x1, double y1, double x2, double y2,
+	double x3, double y3, double x4, double y4);
+void select(int key);
 
 #endif // _HEAD_HPP_

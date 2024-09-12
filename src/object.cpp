@@ -3,15 +3,21 @@
 
 #include <algorithm>
 #include <limits>
-#include <stdlib.h>
+#include <cstdlib>
 
 #include <glad/glad.h>
 #include <glm/gtc/type_ptr.hpp>
 
 #include "head.hpp"
-#include "logic.hpp"
 
 // object
+
+object::object(void) :
+	x(0), y(0), _x(0.0), _y(0.0), width(0), height(0),
+	x1(0), y1(0), x2(0), y2(0),
+	offset(0), toggle(false), moving(false),
+	orientation(enum_orientation::NONE), type(enum_type::NONE),
+	texture(NULL), other_tex(NULL), hitbox(NULL) {}
 
 object::object(double x, double y, int width, int height, enum_orientation orientation, enum_type type,
 	std::vector<struct rect>* tex, std::vector<struct box>* hbox) :
@@ -23,12 +29,29 @@ object::object(double x, double y, int width, int height, enum_orientation orien
 
 object* object::selected = NULL;
 
-void object::render(void) {
+void object::render(int layer) const {
 	if (texture == NULL || !on_screen())
 		return;
-	std::vector<struct rect>* tex = toggle ? texture : other_tex;
-	for (size_t i = 0; i < tex->size(); i++) {
+	std::vector<struct rect>* tex = toggle ? other_tex : texture;
+	switch (type) {
+	case enum_type::MIRROR:
+		tex += (int)orientation % 8;
+		break;
+	case enum_type::DIAGONAL_MIRROR:
+		tex += ((int)orientation - 2) % 8 == 0 ? 0 : 1;
+		break;
+	case enum_type::GLASS_BLOCK:
+		tex += (int)orientation % 8 / 2;
+		break;
+	default:
+		break;
+	}
+	for (int i = 0; i < tex->size(); i++) {
 		rect& quad = tex->data()[i];
+		if (quad.layer < layer)
+			continue;
+		if (quad.layer > layer)
+			return;
 		glEnable(GL_SCISSOR_TEST);
 		glScissor(
 			(GLint)round((_x + quad.x) * PX_SIZE), (GLint)round((_y + quad.y) * PX_SIZE),
@@ -48,6 +71,9 @@ void object::render(void) {
 		glDisable(GL_BLEND);
 		glDisable(GL_SCISSOR_TEST);
 	}
+}
+
+void object::border(void) const {
 	if (this == object::selected) {
 		rect r[4] = {
 			{(GLint)round((_x - 4) * PX_SIZE), (GLint)round((_y - 4) * PX_SIZE), (width + 7) * PX_SIZE, PX_SIZE},
@@ -68,7 +94,8 @@ void object::render(void) {
 				h += __y;
 				__y = 0;
 			}
-			if ((GLsizei)w <= 0 || (GLsizei)h <= 0)
+			if ((GLsizei)w <= 0 || (GLsizei)h <= 0
+				|| (GLint)__x > 1280.0 || (GLint)__y > 720.0)
 				continue;
 			glEnable(GL_SCISSOR_TEST);
 			glScissor((GLint)__x, (GLint)__y, (GLsizei)w, (GLsizei)h);
@@ -77,8 +104,7 @@ void object::render(void) {
 			glUniform4f(glGetUniformLocation(res::shaders::rectangle, "colour"), 1.0f, 1.0f, 1.0f, 0.5f);
 			glUniform1f(glGetUniformLocation(res::shaders::rectangle, "noise"), 0.0f);
 			glUniform1f(glGetUniformLocation(res::shaders::rectangle, "pxsize"), (GLfloat)PX_SIZE);
-			glUniform1ui(glGetUniformLocation(res::shaders::rectangle, "offsetx"), 0);
-			glUniform1ui(glGetUniformLocation(res::shaders::rectangle, "offsety"), 0);
+			glUniform2f(glGetUniformLocation(res::shaders::rectangle, "offset"), 0.0f, 0.0f);
 			glUseProgram(res::shaders::rectangle);
 			glBindVertexArray(res::rect_vao);
 			glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -140,10 +166,10 @@ std::list<photon> photon::photons;
 std::list<node> photon::nodes;
 std::vector<node*> photon::removing;
 
-void photon::render(void) {
+void photon::render(void) const {
 	if (texture == NULL || !on_screen() || direction == enum_direction::NONE)
 		return;
-	for (size_t i = 0; i < texture->size(); i++) {
+	for (int i = 0; i < texture->size(); i++) {
 		rect quad = texture->data()[i];
 		glEnable(GL_SCISSOR_TEST);
 		double __x = (_x + (double)quad.x) * PX_SIZE;
@@ -168,8 +194,7 @@ void photon::render(void) {
 		glUniform4fv(glGetUniformLocation(res::shaders::rectangle, "colour"),
 			1, glm::value_ptr(quad.colour)); glUniform1f(glGetUniformLocation(res::shaders::rectangle, "noise"), 0.0f);
 		glUniform1f(glGetUniformLocation(res::shaders::rectangle, "pxsize"), (GLfloat)PX_SIZE);
-		glUniform1ui(glGetUniformLocation(res::shaders::rectangle, "offsetx"), 0);
-		glUniform1ui(glGetUniformLocation(res::shaders::rectangle, "offsety"), 0);
+		glUniform2f(glGetUniformLocation(res::shaders::rectangle, "offset"), 0.0f, 0.0f);
 		glUseProgram(res::shaders::rectangle);
 		glBindVertexArray(res::rect_vao);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
