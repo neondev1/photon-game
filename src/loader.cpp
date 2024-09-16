@@ -10,12 +10,15 @@ namespace res::loader {
 }
 
 void res::loader::load_obj(void) {
+
 }
 
 void res::loader::load_level(int level) {
 	photon::removing.clear();
 	photon::nodes.clear();
 	photon::photons.clear();
+	object::selected = NULL;
+	object::invalidated.clear();
 	res::objects.clear();
 	res::objects.resize(res::loader::levels[level].size() - 1);
 	memcpy(res::objects.data(),
@@ -26,7 +29,16 @@ void res::loader::load_level(int level) {
 		res::objects.data()[0]._x,
 		res::objects.data()[0]._y,
 		(photon::enum_direction)res::objects.data()[0].offset,
-		0,
+		0, 0,
 		NULL
 	));
+}
+
+namespace gamestate {
+	bool started = false;
+	bool hardcore = false;
+	int level = 0;
+	int failures = 0;
+	double time = 0.0;
+	std::string save;
 }

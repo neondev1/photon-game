@@ -1,11 +1,11 @@
 #ifndef _GUI_HPP_
 #define _GUI_HPP_
 
-#include <string>
-
 #include "head.hpp"
 
 namespace gui {
+	extern GLFWwindow* window;
+
 	enum class enum_event { MOVE, CLICK, TEXT, KEY };
 
 	class element {
@@ -75,6 +75,8 @@ namespace gui {
 	public:
 		int height, margin;
 		int state;
+		size_t cursor_pos;
+		double last_clicked;
 		glm::vec4 inactive, active;
 
 		textbox(int x, int y, int width, int height,
@@ -88,8 +90,9 @@ namespace gui {
 	void load_font(void);
 	void load_gui(void);
 
+	std::string time(double t);
+
 	extern bool menu;
-	extern bool started;
 	extern bool quit;
 	extern std::vector<element*> elements;
 	extern std::vector<rect> font[128];

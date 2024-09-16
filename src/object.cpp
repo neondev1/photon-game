@@ -28,6 +28,8 @@ object::object(double x, double y, int width, int height, enum_orientation orien
 	texture(tex), other_tex(tex), hitbox(hbox) {}
 
 object* object::selected = NULL;
+std::vector<object*> object::invalidated;
+bool object::invalidate_all = false;
 
 void object::render(int layer) const {
 	if (texture == NULL || !on_screen())
@@ -38,6 +40,8 @@ void object::render(int layer) const {
 		tex += (int)orientation % 8;
 		break;
 	case enum_type::DIAGONAL_MIRROR:
+	case enum_type::SPLITTER:
+	case enum_type::FIXED_SPLITTER:
 		tex += ((int)orientation - 2) % 8 == 0 ? 0 : 1;
 		break;
 	case enum_type::GLASS_BLOCK:
@@ -48,10 +52,12 @@ void object::render(int layer) const {
 	}
 	for (int i = 0; i < tex->size(); i++) {
 		rect& quad = tex->data()[i];
-		if (quad.layer < layer)
-			continue;
-		if (quad.layer > layer)
-			return;
+		if (layer >= 0) {
+			if (quad.layer < layer)
+				continue;
+			if (quad.layer > layer)
+				return;
+		}
 		glEnable(GL_SCISSOR_TEST);
 		glScissor(
 			(GLint)round((_x + quad.x) * PX_SIZE), (GLint)round((_y + quad.y) * PX_SIZE),
@@ -124,6 +130,7 @@ void object::tick(int tps) {
 		moving = false;
 		return;
 	}
+	object::invalidate_all = true;
 	double angle = atan2(2 * dest_y - y2 - y1, 2 * dest_x - x2 - x1);
 	double vel = 3.0 * distance(x, y, dest_x, dest_y) / tps;
 	if (vel > 120.0 / tps)
@@ -155,9 +162,9 @@ double object::angle() const {
 
 // photon
 
-photon::photon(std::vector<struct rect>* tex, double x, double y, enum_direction dir, int dc, node* parent) :
+photon::photon(std::vector<struct rect>* tex, double x, double y, enum_direction dir, int dc, int split, node* parent) :
 	object(x, y, 4, 4, enum_orientation::NONE, enum_type::NONE, NULL, NULL),
-	_tick(0.0), medium(NULL), direction(dir), dc(dc), parent(parent),
+	_tick(0.0), medium(NULL), direction(dir), dc(dc), split(split), parent(parent),
 	interacting(NULL), i_hbox(), i_line(0) {
 	texture = tex;
 }

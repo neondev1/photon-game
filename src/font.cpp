@@ -1,7 +1,7 @@
 #include "gui.hpp"
 
 void gui::load_font(void) {
-	// Placeholder
+	// Unknown
 	font[0].push_back({ 0, 0, 7, 11 });
 	// Right arrow
 	font[1].push_back({ 0, 5, 7, 1 });
@@ -63,7 +63,7 @@ void gui::load_font(void) {
 	font[7].push_back({ 5, 7, 1, 1 });
 	font[7].push_back({ 3, 8, 1, 2 });
 	font[7].push_back({ 6, 2, 1, 2 });
-	// Everything else
+	// Self-explanatory
 	font['\b'].push_back({ 0, 5, 7, 1 });
 	font['\b'].push_back({ 1, 4, 1, 3 });
 	font['\b'].push_back({ 2, 3, 1, 5 });
@@ -78,6 +78,19 @@ void gui::load_font(void) {
 	font['\r'].push_back({ 1, 3, 1, 3 });
 	font['\r'].push_back({ 2, 2, 1, 1 });
 	font['\r'].push_back({ 2, 6, 1, 1 });
+	// Spacebar
+	font[16].push_back({ 0, 0, 1, 2 });
+	font[16].push_back({ 6, 0, 1, 2 });
+	font[16].push_back({ 1, 0, 5, 1 });
+	// Cursor
+	font[17].push_back({ 0, 0, 7, 2 });
+	// Colon (time)
+	font[18].push_back({ 3, 3, 1, 1 });
+	font[18].push_back({ 3, 7, 1, 1 });
+	// Decimal point (time)
+	font[19].push_back({ 3, 1, 1, 1 });
+	// Use font[20] to font[31] for other chars if needed
+	// Everything else
 	font['!'].push_back({ 0, 0, 2, 2 });
 	font['!'].push_back({ 0, 3, 2, 8 });
 	font['"'].push_back({ 2, 8, 1, 2 });

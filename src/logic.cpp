@@ -1,8 +1,20 @@
+#include <functional>
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
 #include "head.hpp"
+
+static bool search_nodes(node* root, std::function<bool(photon*)> predicate) {
+	for (int i = 0; i < root->items.size(); i++)
+		if (predicate(root->items.data()[i]))
+			return true;
+	for (int i = 0; i < root->children.size(); i++)
+		if (search_nodes(root->children.data()[i], predicate))
+			return true;
+	return false;
+}
 
 bool interact(photon* const p, double dist, object* const obj,
 	box const* const hitbox, int line, int tps, std::list<photon>::iterator* iter) {
@@ -11,10 +23,49 @@ bool interact(photon* const p, double dist, object* const obj,
 	case object::enum_type::WALL:
 	case object::enum_type::MOVING_WALL:
 		p->direction = photon::enum_direction::NONE;
+		if (p->parent == NULL) {
+			p->destroy();
+			*iter = photon::photons.erase(*iter);
+			return true;
+		}
+		else if (p->parent->type == node::enum_node::SPDC) {
+			node* n = p->parent;
+			p->destroy();
+			*iter = photon::photons.erase(*iter);
+			if (n->children.empty() && n->items.size() == 1) {
+				node::move(n->items.front(), n->parent);
+				for (std::list<node>::iterator it = photon::nodes.begin(); it != photon::nodes.end(); ++it) {
+					if (&*it == n) {
+						photon::nodes.erase(it);
+						break;
+					}
+				}
+			}
+			for (; n->parent && n->items.empty() && n->children.size() == 1; n = n->parent) {
+				node::move(n->children.front(), n->parent);
+				for (std::list<node>::iterator it = photon::nodes.begin(); it != photon::nodes.end(); ++it) {
+					if (&*it == n) {
+						photon::nodes.erase(it);
+						break;
+					}
+				}
+			}
+			return true;
+		}
 		break;
 	case object::enum_type::DOOR:
-		if (!obj->toggle)
+		if (!obj->toggle) {
 			p->direction = photon::enum_direction::NONE;
+			if (p->parent == NULL)
+				p->destroy();
+			else if (p->parent->type == node::enum_node::SPDC) {
+				node* n = p->parent;
+				p->destroy();
+				if (n->children.size() == 0 && n->items.size() == 1)
+					node::move(n->items.front(), n->parent);
+				n->destroy();
+			}
+		}
 		break;
 	case object::enum_type::MIRROR_DOOR:
 		if (obj->toggle)
@@ -75,7 +126,7 @@ bool interact(photon* const p, double dist, object* const obj,
 			if (distance(intersect_x + p->vel(tps) * cos(heading), intersect_y + p->vel(tps) * sin(heading), p->_x, p->_y) <
 				distance(intersect_x + p->vel(tps) * cos(heading2), intersect_y + p->vel(tps) * sin(heading2), p->_x, p->_y))
 				heading = heading2;
-			photon tp = photon(NULL, 0.0, 0.0, photon::enum_direction::NONE, 0, NULL);
+			photon tp = photon(NULL, 0.0, 0.0, photon::enum_direction::NONE, 0, 0, NULL);
 			photon::enum_direction best = (photon::enum_direction)0;
 			double diff = 2 * PI;
 			for (int i = 0; i < (int)photon::enum_direction::NONE; i++) {
@@ -88,8 +139,18 @@ bool interact(photon* const p, double dist, object* const obj,
 			p->direction = best;
 			p->medium = p->medium == obj ? NULL : obj;
 		}
-		else
+		else {
 			p->direction = photon::enum_direction::NONE;
+			if (p->parent == NULL)
+				p->destroy();
+			else if (p->parent->type == node::enum_node::SPDC) {
+				node* n = p->parent;
+				p->destroy();
+				if (n->children.size() == 0 && n->items.size() < 2)
+					node::move(n->items.front(), n->parent);
+				photon::removing.push_back(n);
+			}
+		}
 		break;
 	case object::enum_type::FIXED_BLOCK:
 	case object::enum_type::MOVING_BLOCK: {
@@ -137,7 +198,7 @@ bool interact(photon* const p, double dist, object* const obj,
 		if (distance(intersect_x + p->vel(tps) * cos(heading), intersect_y + p->vel(tps) * sin(heading), p->_x, p->_y) <
 			distance(intersect_x + p->vel(tps) * cos(heading2), intersect_y + p->vel(tps) * sin(heading2), p->_x, p->_y))
 			heading = heading2;
-		photon tp = photon(NULL, 0.0, 0.0, photon::enum_direction::NONE, 0, NULL);
+		photon tp = photon(NULL, 0.0, 0.0, photon::enum_direction::NONE, 0, 0, NULL);
 		photon::enum_direction best = (photon::enum_direction)0;
 		double diff = 2 * PI;
 		for (int i = 0; i < (int)photon::enum_direction::NONE; i++) {
@@ -190,7 +251,7 @@ bool interact(photon* const p, double dist, object* const obj,
 		if (distance(intersect_x + p->vel(tps) * cos(heading), intersect_y + p->vel(tps) * sin(heading), p->_x, p->_y) <
 			distance(intersect_x + p->vel(tps) * cos(heading2), intersect_y + p->vel(tps) * sin(heading2), p->_x, p->_y))
 			heading = heading2;
-		photon tp = photon(NULL, 0.0, 0.0, photon::enum_direction::NONE, 0, NULL);
+		photon tp = photon(NULL, 0.0, 0.0, photon::enum_direction::NONE, 0, 0, NULL);
 		photon::enum_direction best = (photon::enum_direction)0;
 		double diff = 2 * PI;
 		for (int i = 0; i < (int)photon::enum_direction::NONE; i++) {
@@ -206,6 +267,7 @@ bool interact(photon* const p, double dist, object* const obj,
 	}
 	case object::enum_type::SPLITTER:
 	case object::enum_type::FIXED_SPLITTER: {
+		p->split++;
 		node* n;
 		if (!p->parent || p->parent->type != node::enum_node::SUPERPOS) {
 			n = p->parent->add(node::enum_node::SUPERPOS);
@@ -213,7 +275,7 @@ bool interact(photon* const p, double dist, object* const obj,
 		}
 		else
 			n = p->parent;
-		photon::photons.push_back(photon(p->texture, p->_x, p->_y, p->direction, p->dc, n));
+		photon::photons.push_back(photon(p->texture, p->_x, p->_y, p->direction, p->dc, p->split, n));
 		photon* np = &photon::photons.back();
 		np->parent->items.push_back(np);
 		np->interacted.push_back(obj);
@@ -240,7 +302,7 @@ bool interact(photon* const p, double dist, object* const obj,
 			}
 			else
 				n = p->parent;
-			photon::photons.push_back(photon(p->texture, p->_x, p->_y, dir1, p->dc, n));
+			photon::photons.push_back(photon(p->texture, p->_x, p->_y, dir1, p->dc, p->split, n));
 			photon* np = &photon::photons.back();
 			np->parent->items.push_back(np);
 			np->interacted.push_back(obj);
@@ -251,17 +313,28 @@ bool interact(photon* const p, double dist, object* const obj,
 	}
 	case object::enum_type::BOMB:
 		if (!p->parent) {
-			//fail
+			gamestate::failures++;
 			return true;
 		}
 		else if (p->parent->type == node::enum_node::SUPERPOS) {
+			if (search_nodes(p->parent, [p](photon* other) { return other->split < p->split; })) {
+				gamestate::failures++;
+				return true;
+			}
+			node* n = p->parent;
 			p->destroy();
 			*iter = photon::photons.erase(*iter);
+			if (!n->children.empty())
+				return true;
+			for (int i = 0; i < n->items.size(); i++)
+				if (n->items.data()[i]->direction != photon::enum_direction::NONE)
+					return true;
+			photon::removing.push_back(n);
 			return true;
 		}
 		for (node* n = p->parent;; n = n->parent) {
 			if (!n->parent) {
-				// fail
+				gamestate::failures++;
 				return true;
 			}
 			else if (n->parent->type == node::enum_node::SUPERPOS) {
@@ -312,7 +385,7 @@ void select(int key) {
 	if (object::selected == NULL)
 		return;
 	object* best = NULL;
-	object::enum_type unselectables[] = {
+	static object::enum_type unselectables[] = {
 		object::enum_type::WALL,
 		object::enum_type::DIAGONAL_MIRROR, object::enum_type::MIRROR_BLOCK,
 		object::enum_type::FIXED_BLOCK, object::enum_type::PRISM,

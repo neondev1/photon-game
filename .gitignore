@@ -1,3 +1,7 @@
+# Things generated during testing
+settings
+saves/
+
 # Prerequisites
 *.d
 

@@ -7,14 +7,15 @@
 #include <list>
 #include <vector>
 
+#include <ctime>
+#include <string>
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
 #define PX_SIZE 2
 #define PI 3.14159265359
-
-extern GLFWwindow* window;
 
 struct rect {
 	GLint x, y;
@@ -32,6 +33,8 @@ struct box {
 class object {
 public:
 	static object* selected;
+	static std::vector<object*> invalidated;
+	static bool invalidate_all;
 
 	enum class enum_orientation {
 		N, NNW, NW, NWW,
@@ -90,14 +93,14 @@ public:
 		NONE
 	};
 	double _tick;
-	int dc;
+	int dc, split;
 	object* medium;
 	node* parent;
 	enum_direction direction;
 	std::deque<int> immune;
 	std::deque<object*> interacted;
 	
-	photon(std::vector<struct rect>* texture, double x, double y, enum_direction dir, int dc, node* parent);
+	photon(std::vector<struct rect>* texture, double x, double y, enum_direction dir, int dc, int split, node* parent);
 
 	void render(void) const;
 	inline bool on_screen(void) const { return _x < 1280.0 / PX_SIZE && _x + width > 0.0 && _y < 720.0 / PX_SIZE && _y + height > 0.0; }
@@ -155,6 +158,15 @@ namespace res {
 namespace keybinds {
 	extern int up, left, down, right;
 	extern int ccw, cw, perp, toggle;
+}
+
+namespace gamestate {
+	extern bool started;
+	extern bool hardcore;
+	extern int level;
+	extern int failures;
+	extern double time;
+	extern std::string save;
 }
 
 inline double distance(double x1, double y1, double x2, double y2) {

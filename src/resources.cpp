@@ -501,7 +501,6 @@ void res::loader::load_tex(void) {
 	textures[24].push_back({ 11, 16, 1, 2, colour, 5.0f, 5 });
 	textures[24].push_back({ 9, 18, 2, 1, colour, 5.0f, 5 });
 	// SPDC_CRYSTAL
-	textures[25].push_back({ 1, 1, 19, 19, glm::vec4(0.8f, 0.8f, 0.6f, 0.1f), 5.0f, 5 });
 	colour = glm::vec4(0.8f, 0.8f, 0.6f, 0.2f);
 	textures[25].push_back({ 0, 0, 20, 1, colour, 5.0f, 5 });
 	textures[25].push_back({ 0, 1, 1, 19, colour, 5.0f, 5 });
@@ -511,8 +510,8 @@ void res::loader::load_tex(void) {
 		textures[25].push_back({ 2 + i, 5 - i, 1, 1, colour, 5.0f, 5 });
 		textures[25].push_back({ 14 + i, 17 - i, 1, 1, colour, 5.0f, 5 });
 	}
+	textures[25].push_back({ 1, 1, 19, 19, glm::vec4(0.8f, 0.8f, 0.6f, 0.1f), 5.0f, 6 });
 	// MOVING_CRYSTAL
-	textures[26].push_back({ 1, 1, 19, 19, glm::vec4(0.8f, 0.8f, 0.6f, 0.1f), 5.0f, 5 });
 	textures[26].push_back({ 0, 0, 20, 1, colour, 5.0f, 5 });
 	textures[26].push_back({ 0, 1, 1, 19, colour, 5.0f, 5 });
 	textures[26].push_back({ 1, 19, 19, 1, colour, 5.0f, 5 });
@@ -521,6 +520,7 @@ void res::loader::load_tex(void) {
 		textures[26].push_back({ 2 + i, 5 - i, 1, 1, colour, 5.0f, 5 });
 		textures[26].push_back({ 14 + i, 17 - i, 1, 1, colour, 5.0f, 5 });
 	}
+	textures[26].push_back({ 1, 1, 19, 19, glm::vec4(0.8f, 0.8f, 0.6f, 0.1f), 5.0f, 6 });
 	colour = glm::vec4(0.7f, 0.7f, 0.5f, 0.3f);
 	textures[26].push_back({ 6, 9, 3, 2, colour, 3.0f, 6 });
 	textures[26].push_back({ 11, 9, 3, 2, colour, 3.0f, 6 });
@@ -538,11 +538,55 @@ void res::loader::load_tex(void) {
 	textures[26].push_back({ 7, 5, 6, 1, colour, 3.0f, 6 });
 	textures[26].push_back({ 7, 14, 6, 1, colour, 3.0f, 6 });
 	// SPLITTER (NW/SE)
-
+	colour = glm::vec4(0.8f, 1.0f, 0.9f, 0.2f);
+	textures[27].push_back({ 0, 0, 20, 1, colour, 5.0f, 5 });
+	textures[27].push_back({ 0, 1, 1, 19, colour, 5.0f, 5 });
+	textures[27].push_back({ 1, 19, 19, 1, colour, 5.0f, 5 });
+	textures[27].push_back({ 19, 1, 1, 18, colour, 5.0f, 5 });
+	for (int i = 0; i < 18; i++)
+		textures[27].push_back({ 1 + i, 1 + i, 1, 1, glm::vec4(0.5f, 0.5f, 0.5f, 0.5f), 0.0f, 5 });
 	// SPLITTER (NE/SW)
-
-	// BOMB
-
+	textures[28].push_back({ 0, 0, 20, 1, colour, 5.0f, 5 });
+	textures[28].push_back({ 0, 1, 1, 19, colour, 5.0f, 5 });
+	textures[28].push_back({ 1, 19, 19, 1, colour, 5.0f, 5 });
+	textures[28].push_back({ 19, 1, 1, 18, colour, 5.0f, 5 });
+	for (int i = 0; i < 18; i++)
+		textures[28].push_back({ 18 - i, 1 + i, 1, 1, glm::vec4(0.5f, 0.5f, 0.5f, 0.5f), 0.0f, 5 });
+	// BOMB (normal)
+	textures[29].push_back({ 0, 0, 20, 20, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), 2.0f, 4 });
+	textures[29].push_back({ 1, 2, 18, 16, glm::vec4(0.1f, 0.1f, 0.1f, 1.0f), 2.0f, 4 });
+	for (int i = 0; i < 8; i++) {
+		textures[29].push_back({ 1 + i, 1 + i, 18 - i * 2, 1, glm::vec4(0.05f, 0.05f, 0.05f, 1.0f), 0.0f, 4});
+		textures[29].push_back({ 1 + i, 18 - i, 18 - i * 2, 1, glm::vec4(0.15f, 0.15f, 0.15f, 1.0f), 0.0f, 4});
+	}
+	colour = glm::vec4(0.5f, 0.0f, 0.0f, 1.0f);
+	textures[29].push_back({ 9, 5, 2, 2, colour, 2.0f, 4 });
+	textures[29].push_back({ 9, 9, 2, 6, colour, 2.0f, 4 });
+	// BOMB (hardcore)
+	textures[30].push_back({ 0, 0, 20, 20, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), 2.0f, 4 });
+	textures[30].push_back({ 1, 2, 18, 16, glm::vec4(0.1f, 0.1f, 0.1f, 1.0f), 2.0f, 4 });
+	for (int i = 0; i < 8; i++) {
+		textures[30].push_back({ 1 + i, 1 + i, 18 - i * 2, 1, glm::vec4(0.05f, 0.05f, 0.05f, 1.0f), 0.0f, 4 });
+		textures[30].push_back({ 1 + i, 18 - i, 18 - i * 2, 1, glm::vec4(0.15f, 0.15f, 0.15f, 1.0f), 0.0f, 4 });
+	}
+	colour = glm::vec4(0.5f, 0.4f, 0.0f, 1.0f);
+	textures[30].push_back({ 9, 9, 2, 2, colour, 20.0f, 4 });
+	textures[30].push_back({ 8, 4, 4, 3, colour, 20.0f, 4 });
+	textures[30].push_back({ 7, 5, 6, 1, colour, 20.0f, 4 });
+	textures[30].push_back({ 9, 7, 2, 1, colour, 20.0f, 4 });
+	textures[30].push_back({ 5, 10, 2, 3, colour, 20.0f, 4 });
+	textures[30].push_back({ 6, 12, 3, 2, colour, 20.0f, 4 });
+	textures[30].push_back({ 7, 11, 1, 4, colour, 20.0f, 4 });
+	textures[30].push_back({ 13, 10, 2, 3, colour, 20.0f, 4 });
+	textures[30].push_back({ 11, 12, 3, 2, colour, 20.0f, 4 });
+	textures[30].push_back({ 12, 11, 1, 4, colour, 20.0f, 4 });
 	// SENSOR
+	textures[31].push_back({ 0, 0, 20, 20, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), 2.0f, 4 });
+	textures[31].push_back({ 1, 2, 18, 16, glm::vec4(0.1f, 0.1f, 0.1f, 1.0f), 2.0f, 4 });
+	for (int i = 0; i < 8; i++) {
+		textures[31].push_back({ 1 + i, 1 + i, 18 - i * 2, 1, glm::vec4(0.05f, 0.05f, 0.05f, 1.0f), 0.0f, 4 });
+		textures[31].push_back({ 1 + i, 18 - i, 18 - i * 2, 1, glm::vec4(0.15f, 0.15f, 0.15f, 1.0f), 0.0f, 4 });
+	}
+	textures[31].push_back({ 9, 9, 2, 2, glm::vec4(0.3f, 0.9f, 0.6f, 1.0f), 10.0f, 4 });
 
 }
