@@ -7,26 +7,31 @@
 #include <locale>
 #include <sstream>
 
-#include <glm/gtc/type_ptr.hpp>
-
 #include "gui.hpp"
 
-#define CURSOR 17
+#define FONT_SPACEBAR	16
+#define FONT_CURSOR 	17
+#define FONT_TCOLON 	18
+#define FONT_TDECIMAL	19
+#define FONT_O_UMLAUT	20
+
+#define STR(x) std::string({(char)x})
 
 namespace fs = std::filesystem;
 
 namespace keybinds {
-	int up		= GLFW_KEY_W;
+	int up  	= GLFW_KEY_W;
 	int left	= GLFW_KEY_A;
 	int down	= GLFW_KEY_S;
 	int right	= GLFW_KEY_D;
-	int ccw		= GLFW_KEY_LEFT_BRACKET;
-	int cw		= GLFW_KEY_RIGHT_BRACKET;
+	int ccw 	= GLFW_KEY_LEFT_BRACKET;
+	int cw  	= GLFW_KEY_RIGHT_BRACKET;
 	int perp	= GLFW_KEY_BACKSLASH;
 	int toggle	= GLFW_KEY_SLASH;
 }
 
 namespace gui {
+	size_t frame = 0;
 	bool menu = true;
 	bool quit = false;
 	std::vector<element*> elements;
@@ -34,19 +39,23 @@ namespace gui {
 }
 
 void gui::load_gui(void) {
-	glm::vec4 fore = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-	glm::vec4 back = glm::vec4(0.2f, 0.2f, 0.2f, 0.4f);
-	gui::elements.push_back(new gui::panel(0, 0, 1280, 720, true, glm::vec4(0.1f, 0.1f, 0.1f, 1.0f), 6.0f));
+	vec fore = vec(1.0f, 1.0f, 1.0f, 1.0f);
+	vec back = vec(0.2f, 0.2f, 0.2f, 0.4f);
+	gui::elements.push_back(new gui::panel(0, 0, 1280, 720, true, vec(0.1f, 0.1f, 0.1f, 1.0f), 6.0f));
 	gui::elements.push_back(new gui::label(100, 100, 1000, true, "PHOTON", fore, 6));
 	gui::elements.push_back(new gui::button(100, 240, 90, 42, true, 10, "PLAY",
 		fore, back, []() {
 		if (gamestate::hardcore && gamestate::failures)
 			return;
+		if (gamestate::level > res::loader::levels.size())
+			return;
 		if (gamestate::started) {
+			glClear(GL_COLOR_BUFFER_BIT);
 			int index = 0;
 			for (; index < gui::elements.size() - 2 && gui::elements.data()[index]->text != "No valid savefile loaded"; index++);
 			gui::elements.data()[index]->visible = false;
 			gui::elements.data()[index + 1]->visible = false;
+			gui::frame = -1;
 			gui::menu = false;
 		}
 		else if (!gamestate::save.empty()) {
@@ -59,9 +68,12 @@ void gui::load_gui(void) {
 				gui::elements.data()[index - 1]->visible = false;
 			}
 			else {
+				glClear(GL_COLOR_BUFFER_BIT);
 				gui::elements.data()[1]->text = "PAUSED";
 				gamestate::started = true;
+				gui::frame = -1;
 				gui::menu = false;
+				res::loader::load_level(0);
 			}
 			out.close();
 		}
@@ -184,10 +196,17 @@ void gui::load_gui(void) {
 		fore, back, []() { gui::quit = true; }));
 	gui::elements.push_back(new gui::button(1035, 600, 145, 42, true, 10, "CREDITS",
 		fore, back, []() {
+		static int count = 0;
 		int index = 0;
 		for (; index < gui::elements.size() - 1
 			&& gui::elements.data()[index]->text.find("License") == std::string::npos; index++);
 		gui::elements.data()[index]->visible = !gui::elements.data()[index]->visible;
+		if (++count > 4 && !(rand() / ((RAND_MAX + 1) / 3))) {
+			index = 0;
+			for (; index < gui::elements.size() - 1
+				&& gui::elements.data()[index]->text.find("neondev1") == std::string::npos; index++);
+			gui::elements.data()[index]->visible = true;
+		}
 	}));
 	// Keybinds menu
 	gui::elements.push_back(new gui::button(20, 20, 110, 42, false, 10, "<BACK",
@@ -236,15 +255,16 @@ void gui::load_gui(void) {
 		cfg.close();
 	}));
 	// Messages
+	gui::elements.push_back(new gui::label(1010, 120, 270, false, "      Matt was here\ngithub" + STR(FONT_TDECIMAL) + "com/neondev1", fore, 1));
 	gui::elements.push_back(new gui::label(200, 255, 1000, false, "No valid savefile loaded", fore, 1));
 	gui::elements.push_back(new gui::label(200, 255, 1000, false, "Unable to write to savefile", fore, 1));
 	gui::elements.push_back(new gui::label(290, 555, 1000, false, "File not found", fore, 1));
 	gui::elements.push_back(new gui::label(290, 555, 1000, false, "Invalid savefile", fore, 1));
-	gui::elements.push_back(new gui::label(100, 650, 1000, false, "This game uses the following libraries:\nGLFW: Copyright (c) 2002-2006 Marcus Geelnard, (c) 2006-2019 Camilla Lowy; licensed under the zlib License\nGlad: Copyright (c) 2013-2022 David Herberth; licensed under the MIT License\nGLM: Copyright (c) 2005 G-Truc Creation; licensed under the MIT License", fore, 1));
-	gui::elements.push_back(new gui::label(700, 100, 1000, false, "Deaths: 0", fore, 2));
-	gui::elements.push_back(new gui::label(700, 100, 1000, false, "Levels: 0", fore, 2));
-	gui::elements.push_back(new gui::label(736, 144, 1000, false, "Time: 0:00:00", fore, 2));
-	gui::elements.push_back(new gui::label(50, 500, 1000, false, "Warning: Missing keybinds", glm::vec4(1.0f, 0.8f, 0.3f, 1.0f), 2));
+	gui::elements.push_back(new gui::label(100, 660, 1000, false, "This game uses the following libraries:\nGLFW: Copyright (c) 2002-2006 Marcus Geelnard, (c) 2006-2019 Camilla L" + STR(FONT_O_UMLAUT) + "wy; licensed under the zlib License\nGlad: Copyright (c) 2013-2022 David Herberth; licensed under the MIT License", fore, 1));
+	gui::elements.push_back(new gui::label(700, 100, 1000, false, "Fails:", fore, 2));
+	gui::elements.push_back(new gui::label(700, 100, 1000, false, "Level:", fore, 2));
+	gui::elements.push_back(new gui::label(736, 144, 1000, false, "Time:", fore, 2));
+	gui::elements.push_back(new gui::label(50, 500, 1000, false, "Warning: Missing keybinds", vec(1.0f, 0.8f, 0.3f, 1.0f), 2));
 }
 
 std::string gui::time(double t) {
@@ -253,14 +273,14 @@ std::string gui::time(double t) {
 	int minutes = (int)((t - hours * 3600.0) / 60.0);
 	int seconds = (int)(t - hours * 3600.0 - minutes * 60.0);
 	int millis = (int)((t - hours * 3600.0 - minutes * 60.0 - seconds) * 1000.0);
-	oss << hours << (char)18
-		<< std::setfill('0') << std::setw(2) << minutes << (char)18
-		<< std::setw(2) << seconds << (char)19
+	oss << hours << (char)FONT_TCOLON
+		<< std::setfill('0') << std::setw(2) << minutes << (char)FONT_TCOLON
+		<< std::setw(2) << seconds << (char)FONT_TDECIMAL
 		<< std::setw(3) << millis;
 	return oss.str();
 }
 
-static void draw(int c, int x, int y, int size, glm::vec4 colour) {
+static void draw(int c, int x, int y, int size, vec colour) {
 	std::vector<rect>* tex;
 	if (c >= 'a' && c <= 'z')
 		tex = &gui::font[c - 'a' + 'A'];
@@ -290,7 +310,7 @@ static void draw(int c, int x, int y, int size, glm::vec4 colour) {
 		glEnable(GL_SCISSOR_TEST);
 		glScissor(x + r.x * size, y + r.y * size, r.width * size, r.height * size);
 		glUniform4fv(glGetUniformLocation(res::shaders::rectangle, "colour"),
-			1, glm::value_ptr(colour));
+			1, colour.ptr());
 		glUniform1f(glGetUniformLocation(res::shaders::rectangle, "noise"), 0.0f);
 		glUniform1f(glGetUniformLocation(res::shaders::rectangle, "pxsize"), 0.0f);
 		glUniform2f(glGetUniformLocation(res::shaders::rectangle, "offset"), 0.0f, 0.0f);
@@ -302,7 +322,7 @@ static void draw(int c, int x, int y, int size, glm::vec4 colour) {
 	}
 }
 
-static void render_text(std::string text, int x, int y, int width, int size, bool cursor, size_t cursor_pos, glm::vec4 colour) {
+static void render_text(std::string text, int x, int y, int width, int size, bool cursor, size_t cursor_pos, vec colour) {
 	if (width == 0)
 		return;
 	GLint gl_x = x, gl_y = 720 - y - size * 11;
@@ -310,7 +330,7 @@ static void render_text(std::string text, int x, int y, int width, int size, boo
 	GLint xpos = 0, ypos = 0;
 	size_t prev = 0;
 	if (cursor_pos == 0 && cursor)
-		draw(CURSOR, gl_x + xpos * size * 9, gl_y - ypos * size * 16, size, colour);
+		draw(FONT_CURSOR, gl_x + xpos * size * 9, gl_y - ypos * size * 16, size, colour);
 	for (size_t cur;
 		(cur = text.find_first_of(" \t/\\\r\n-()[]{}", prev)) != std::string::npos;
 		prev = cur + 1) {
@@ -327,7 +347,7 @@ static void render_text(std::string text, int x, int y, int width, int size, boo
 				ypos++;
 			}
 			if (prev + i + 1 == cursor_pos && cursor)
-				draw(CURSOR, gl_x + xpos * size * 9, gl_y - ypos * size * 16, size, colour);
+				draw(FONT_CURSOR, gl_x + xpos * size * 9, gl_y - ypos * size * 16, size, colour);
 		}
 		if (text.data()[cur] == '\r' || text.data()[cur] == '\n') {
 			xpos = 0;
@@ -340,7 +360,7 @@ static void render_text(std::string text, int x, int y, int width, int size, boo
 				ypos++;
 			}
 			if (cur + 1 == cursor_pos && cursor)
-				draw(CURSOR, gl_x + xpos * size * 9, gl_y - ypos * size * 16, size, colour);
+				draw(FONT_CURSOR, gl_x + xpos * size * 9, gl_y - ypos * size * 16, size, colour);
 		}
 	}
 	if (prev < text.length()) {
@@ -357,19 +377,19 @@ static void render_text(std::string text, int x, int y, int width, int size, boo
 				ypos++;
 			}
 			if (prev + i + 1 == cursor_pos && cursor)
-				draw(CURSOR, gl_x + xpos * size * 9, gl_y - ypos * size * 16, size, colour);
+				draw(FONT_CURSOR, gl_x + xpos * size * 9, gl_y - ypos * size * 16, size, colour);
 		}
 	}
 }
 
 gui::element::element(int x, int y, int width, bool visible,
-	std::string text, glm::vec4 foreground) :
+	std::string text, vec foreground) :
 	x(x), y(y), width(width), text(text), visible(visible), foreground(foreground) {}
 
 // panel
 
 gui::panel::panel(int x, int y, int width, int height, bool visible,
-	glm::vec4 colour, GLfloat noise) :
+	vec colour, GLfloat noise) :
 	element(x, y, width, visible, "", colour), height(height), noise(noise), offset(rand() / ((RAND_MAX + 1) / 256)) { }
 
 void gui::panel::render(void) {
@@ -380,7 +400,7 @@ void gui::panel::render(void) {
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glUniform4fv(glGetUniformLocation(res::shaders::rectangle, "colour"),
-		1, glm::value_ptr(foreground));
+		1, foreground.ptr());
 	glUniform1f(glGetUniformLocation(res::shaders::rectangle, "noise"), noise);
 	glUniform1f(glGetUniformLocation(res::shaders::rectangle, "pxsize"), 3.0f);
 	glUniform2f(glGetUniformLocation(res::shaders::rectangle, "offset"), 0.0f, 0.0f);
@@ -395,7 +415,7 @@ void gui::panel::render(void) {
 // label
 
 gui::label::label(int x, int y, int width, bool visible,
-	std::string text, glm::vec4 foreground, int size) :
+	std::string text, vec foreground, int size) :
 	element(x, y, width, visible, text, foreground), size(size) {}
 
 void gui::label::render(void) {
@@ -407,11 +427,11 @@ void gui::label::render(void) {
 
 gui::button::button(int x, int y, int width, int height,
 	bool visible, int margin, std::string text,
-	glm::vec4 foreground, glm::vec4 background, void (*event)(void)) :
+	vec foreground, vec background, void (*event)(void)) :
 	element(x, y, width, visible, text, foreground), height(height), margin(margin),
 	state(0), inactive(background), event(event) {
-	hover = glm::vec4(background.r * 1.2f, background.g * 1.2f, background.b * 1.2f, background.a);
-	click = glm::vec4(background.r * 1.4f, background.g * 1.4f, background.b * 1.4f, background.a);
+	hover = vec(background.r * 1.2f, background.g * 1.2f, background.b * 1.2f, background.a);
+	click = vec(background.r * 1.4f, background.g * 1.4f, background.b * 1.4f, background.a);
 }
 
 void gui::button::handler(enum_event type, int a, int b, int c) {
@@ -443,7 +463,7 @@ void gui::button::handler(enum_event type, int a, int b, int c) {
 void gui::button::render(void) {
 	if (!visible)
 		return;
-	glm::vec4 colour;
+	vec colour;
 	switch (state) {
 	case 0: colour = inactive;	break;
 	case 1: colour = hover;		break;
@@ -455,7 +475,7 @@ void gui::button::render(void) {
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glUniform4fv(glGetUniformLocation(res::shaders::rectangle, "colour"),
-		1, glm::value_ptr(colour));
+		1, colour.ptr());
 	glUniform1f(glGetUniformLocation(res::shaders::rectangle, "noise"), 0.0f);
 	glUniform1f(glGetUniformLocation(res::shaders::rectangle, "pxsize"), 0.0f);
 	glUniform2f(glGetUniformLocation(res::shaders::rectangle, "offset"), 0.0f, 0.0f);
@@ -471,7 +491,7 @@ void gui::button::render(void) {
 // keybind_button
 
 gui::keybind_button::keybind_button(int x, int y, bool visible, int* key,
-	glm::vec4 foreground, glm::vec4 background) :
+	vec foreground, vec background) :
 	button(x, y, 34, 42, visible, 10, "", foreground, background, NULL),
 	key(key) {}
 
@@ -534,7 +554,7 @@ void gui::keybind_button::render(void) {
 	if (*key == 0)
 		c = ' ';
 	else if (*key == ' ')
-		c = 16;
+		c = FONT_SPACEBAR;
 	else
 		c = *key;
 	draw(c, x + margin, 698 - (y + margin), 2, foreground);
@@ -544,10 +564,10 @@ void gui::keybind_button::render(void) {
 
 gui::textbox::textbox(int x, int y, int width, int height,
 	bool visible, int margin, std::string text,
-	glm::vec4 foreground, glm::vec4 background) :
+	vec foreground, vec background) :
 	element(x, y, width, visible, text, foreground), height(height), margin(margin),
 	state(0), cursor_pos(0), last_clicked(0.0), inactive(background) {
-	active = glm::vec4(background.r * 1.4f, background.g * 1.4f, background.b * 1.4f, background.a);
+	active = vec(background.r * 1.4f, background.g * 1.4f, background.b * 1.4f, background.a);
 }
 
 void gui::textbox::handler(enum_event type, int a, int b, int c) {
@@ -667,13 +687,13 @@ void gui::textbox::handler(enum_event type, int a, int b, int c) {
 void gui::textbox::render(void) {
 	if (!visible)
 		return;
-	glm::vec4 colour = state > 0 ? active : inactive;
+	vec colour = state > 0 ? active : inactive;
 	glEnable(GL_SCISSOR_TEST);
 	glScissor(x, 720 - y - height, width, height);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glUniform4fv(glGetUniformLocation(res::shaders::rectangle, "colour"),
-		1, glm::value_ptr(colour));
+		1, colour.ptr());
 	glUniform1f(glGetUniformLocation(res::shaders::rectangle, "noise"), 0.0f);
 	glUniform1f(glGetUniformLocation(res::shaders::rectangle, "pxsize"), 0.0f);
 	glUniform2f(glGetUniformLocation(res::shaders::rectangle, "offset"), 0.0f, 0.0f);

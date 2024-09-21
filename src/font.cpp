@@ -89,7 +89,18 @@ void gui::load_font(void) {
 	font[18].push_back({ 3, 7, 1, 1 });
 	// Decimal point (time)
 	font[19].push_back({ 3, 1, 1, 1 });
-	// Use font[20] to font[31] for other chars if needed
+	// O-umlaut
+	font[20].push_back({ 2, 0, 3, 1 });
+	font[20].push_back({ 2, 10, 3, 1 });
+	font[20].push_back({ 1, 1, 2, 1 });
+	font[20].push_back({ 1, 9, 2, 1 });
+	font[20].push_back({ 4, 1, 2, 1 });
+	font[20].push_back({ 4, 9, 2, 1 });
+	font[20].push_back({ 0, 2, 2, 7 });
+	font[20].push_back({ 5, 2, 2, 7 });
+	font[20].push_back({ 2, 12, 1, 1 });
+	font[20].push_back({ 4, 12, 1, 1 });
+	// Use font[21] to font[31] for other chars if needed
 	// Everything else
 	font['!'].push_back({ 0, 0, 2, 2 });
 	font['!'].push_back({ 0, 3, 2, 8 });

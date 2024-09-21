@@ -4,9 +4,10 @@
 #include <fstream>
 #include <thread>
 
+#include <iostream>
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-#include <glm/gtc/type_ptr.hpp>
 
 #include "head.hpp"
 
@@ -27,6 +28,9 @@ void text_cb(GLFWwindow* window, unsigned codepoint);
 void key_cb(GLFWwindow* window, int key, int scancode, int action, int mods);
 
 GLFWwindow* gui::window;
+
+// Debugging function
+static bool list_nodes(node* root, int depth);
 
 int main(void) {
 	srand((unsigned)time(NULL));
@@ -78,6 +82,8 @@ int main(void) {
 	gui::load_font();
 	gui::load_gui();
 	res::loader::load_tex();
+	res::loader::load_hbx();
+	res::loader::load_obj();
 	res::shaders::load();
 	glfwSetCursorPosCallback(gui::window, move_cb);
 	glfwSetMouseButtonCallback(gui::window, click_cb);
@@ -85,9 +91,62 @@ int main(void) {
 	glfwSetKeyCallback(gui::window, key_cb);
 	double next = glfwGetTime();
 	int skipped = 1;
-	constexpr const std::chrono::duration<double> zero(0);
+	constexpr std::chrono::seconds zero(0);
+	constexpr std::chrono::seconds one(1);
 	int tps = 64;
-	size_t frame = 0;
+	/*
+	// Debugging code, comment this out when not debugging logic
+	while (1) {
+		std::string s;
+		std::cin >> s;
+		std::transform(s.begin(), s.end(), s.begin(), [](char c) { return std::tolower(c); });
+		int fails = gamestate::failures;
+		if (s == "add")
+			photon::photons.push_back(photon(NULL, 0.0, 0.0, photon::enum_direction::E, 0, 0, NULL));
+		else if (!photon::photons.empty()) {
+			int id = 0;
+			std::cin >> id;
+			photon* p = NULL;
+			std::list<photon>::iterator it = photon::photons.begin();
+			for (; it != photon::photons.end(); ++it) {
+				if (it->id == id) {
+					p = &*it;
+					break;
+				}
+			}
+			object spdc = object();
+			spdc.type = object::enum_type::SPDC_CRYSTAL;
+			object split = object();
+			split.type = object::enum_type::SPLITTER;
+			object bomb = object();
+			bomb.type = object::enum_type::BOMB;
+			object wall = object();
+			wall.type = object::enum_type::WALL;
+			if (s == "spdc")
+				interact(p, 0, &spdc, NULL, 0, tps, &it);
+			else if (s == "split")
+				interact(p, 0, &split, NULL, 0, tps, &it);
+			else if (s == "bomb")
+				interact(p, 0, &bomb, NULL, 0, tps, &it);
+			else if (s == "wall")
+				interact(p, 0, &wall, NULL, 0, tps, &it);
+			if (photon::deleting.size() > 0) {
+				for (std::list<node>::iterator it = photon::nodes.begin(); it != photon::nodes.end();) {
+					node* n = &*it;
+					if (std::any_of(photon::deleting.begin(), photon::deleting.end(),
+						[n](node* other) { return other == n; }))
+						it = photon::nodes.erase(it);
+					else
+						++it;
+				}
+				photon::deleting.clear();
+			}
+		}
+		if (gamestate::failures > fails)
+			std::cout << "Fail" << std::endl;
+		list_nodes(NULL, 0);
+	}
+	*/
 	// This program is probably about as stable as the economy
 	// of the Weimar Republic during the hyperinflation of 1923
 	while (!glfwWindowShouldClose(gui::window)) {
@@ -109,27 +168,74 @@ int main(void) {
 					if (it->_tick < len && it->_tick != 0)
 						len = it->_tick;
 				}
-				int fails = gamestate::failures;
+				int fails = gamestate::failures, level = gamestate::level;
 				for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end();)
 					it->tick(tps, len, &it);
-				if (gamestate::failures == fails) {
-					for (int i = 0; i < photon::removing.size(); i++)
-						photon::removing.data()[i]->destroy();
-					if (photon::removing.size() > 0) {
-						for (std::list<node>::iterator it = photon::nodes.begin(); it != photon::nodes.end();) {
-							node* n = &*it;
-							if (std::any_of(photon::removing.begin(), photon::removing.end(),
-								[n](node* other) { return other == n; }))
-								it = photon::nodes.erase(it);
-							else
-								++it;
-						}
-						photon::removing.clear();
+				if (gamestate::level > level) {
+					if (gamestate::level >= res::loader::levels.size()) {
+						photon::deleting.clear();
+						photon::nodes.clear();
+						photon::photons.clear();
+						object::selected = NULL;
+						object::invalidated.clear();
+						res::objects.clear();
+						std::ofstream out(gamestate::save, std::ios::trunc);
+						out << (gamestate::hardcore ? 'h' : 'n') << '\n' << gamestate::level << '\n';
+						out << gamestate::failures << '\n' << gamestate::time << std::endl;
+						out.close();
+						gamestate::started = false;
+						gui::elements[1]->text = "=SUCCESS=";
+						int index = 0;
+						for (; index < gui::elements.size() - 3
+							&& gui::elements.data()[index]->text.find("Fails: ") == std::string::npos; index++);
+						gui::elements.data()[index]->text = std::string("Fails: ") + std::to_string(gamestate::failures);
+						gui::elements.data()[index]->visible = true;
+						gui::elements.data()[index + 2]->text = std::string("Time: ") + gui::time(gamestate::time);
+						gui::elements.data()[index + 2]->visible = true;
 					}
-					next += len / tps;
+					glClear(GL_COLOR_BUFFER_BIT);
+					glfwSwapBuffers(gui::window);
+					std::this_thread::sleep_for(one);
+					res::loader::load_level(gamestate::level);
+					gui::frame = -1;
+				}
+				else if (gamestate::failures == fails) {
+					bool fail = true;
+					for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end(); ++it) {
+						if (it->direction != photon::enum_direction::NONE) {
+							fail = false;
+							break;
+						}
+					}
+					if (fail || photon::photons.empty()) {
+						gamestate::failures++;
+						glClear(GL_COLOR_BUFFER_BIT);
+						glfwSwapBuffers(gui::window);
+						std::this_thread::sleep_for(one);
+						res::loader::load_level(gamestate::level);
+						gui::frame = -1;
+					}
+					else {
+						for (std::unordered_set<node*>::iterator it = photon::deleting.begin(); it != photon::deleting.end(); ++it) {
+							(*it)->clear();
+							photon::nodes.remove_if([it](const node& other) { return &other == *it; });
+						}
+						if (photon::deleting.size() > 0) {
+							for (std::list<node>::iterator it = photon::nodes.begin(); it != photon::nodes.end();) {
+								node* n = &*it;
+								if (std::any_of(photon::deleting.begin(), photon::deleting.end(),
+									[n](node* other) { return other == n; }))
+									it = photon::nodes.erase(it);
+								else
+									++it;
+							}
+							photon::deleting.clear();
+						}
+						next += len / tps;
+					}
 				}
 				else if (gamestate::hardcore) {
-					photon::removing.clear();
+					photon::deleting.clear();
 					photon::nodes.clear();
 					photon::photons.clear();
 					object::selected = NULL;
@@ -143,75 +249,111 @@ int main(void) {
 					gui::elements[1]->text = "GAME OVER";
 					int index = 0;
 					for (; index < gui::elements.size() - 2
-						&& gui::elements.data()[index]->text.find("Levels: ") == std::string::npos; index++);
-					gui::elements.data()[index]->text = std::string("Levels: ") + std::to_string(gamestate::level);
+						&& gui::elements.data()[index]->text.find("Level: ") == std::string::npos; index++);
+					gui::elements.data()[index]->text = std::string("Level: ") + std::to_string(gamestate::level);
 					gui::elements.data()[index]->visible = true;
 					gui::elements.data()[index + 1]->text = std::string("Time: ") + gui::time(gamestate::time);
 					gui::elements.data()[index + 1]->visible = true;
 				}
-
+				else {
+					glClear(GL_COLOR_BUFFER_BIT);
+					glfwSwapBuffers(gui::window);
+					std::this_thread::sleep_for(one);
+					res::loader::load_level(gamestate::level);
+					gui::frame = -1;
+				}
 			}
 			if (cur < next || skipped > 5) {
-				frame++;
+				gui::frame++;
 				if (gui::menu) {
 					glClear(GL_COLOR_BUFFER_BIT);
 					for (int i = 0; i < gui::elements.size(); i++)
 						gui::elements.data()[i]->render();
 				}
-				else if (frame % 2 && !object::invalidate_all) {
+				else if ((gui::frame % 10 - gui::frame % 2) && !object::invalidate_all) {
 					for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end(); ++it) {
 						glEnable(GL_SCISSOR_TEST);
 						glScissor(
-							(GLint)round(it->_x - 240.0 / tps), (GLint)round(it->_y - 240.0 / tps),
-							(GLsizei)(480.0 / tps), (GLsizei)(480.0 / tps));
+							(GLint)std::round(it->_x - 480.0 / tps)* PX_SIZE, (GLint)std::round(it->_y - 480.0 / tps)* PX_SIZE,
+							(GLsizei)(PX_SIZE * 960.0 / tps), (GLsizei)(PX_SIZE * 960.0 / tps));
 						glUniform4fv(glGetUniformLocation(res::shaders::rectangle, "colour"),
-							1, glm::value_ptr(res::objects.data()[0].texture->data()[0].colour));
-						glUniform1f(glGetUniformLocation(res::shaders::rectangle, "noise"), res::objects.data()[0].texture->data()[0].noise);
+							1, rect::background.colour.ptr());
+						glUniform1f(glGetUniformLocation(res::shaders::rectangle, "noise"),
+							rect::background.noise);
 						glUniform1f(glGetUniformLocation(res::shaders::rectangle, "pxsize"), (GLfloat)PX_SIZE);
 						glUniform2f(glGetUniformLocation(res::shaders::rectangle, "offset"),
-							(GLfloat)(res::objects.data()[0].offset - round(it->_x - 240.0 / tps)),
-							(GLfloat)(res::objects.data()[0].offset - round(it->_y - 240.0 / tps)));
+							(GLfloat)res::objects.data()[0].offset,
+							(GLfloat)res::objects.data()[0].offset);
 						glUseProgram(res::shaders::rectangle);
 						glBindVertexArray(res::rect_vao);
 						glDrawArrays(GL_TRIANGLES, 0, 6);
 						glBindVertexArray(0);
 						glDisable(GL_SCISSOR_TEST);
 					}
+					if (object::selected) {
+						if (object::selected->linked) {
+							for (int i = 0; i < object::selected->linked->members.size(); i++)
+								object::selected->linked->members.data()[i]->border(true);
+						}
+						else
+							object::selected->border(true);
+					}
+					for (int i = 1; i < res::objects.size(); i++) {
+						object& obj = res::objects.data()[i];
+						if (std::any_of(photon::photons.begin(), photon::photons.end(), [obj, tps](photon p) {
+							return (int)obj.type && ((int)obj.type < (int)object::enum_type::GLASS_BLOCK
+								|| (int)obj.type >(int)object::enum_type::SPLITTER)
+								&& obj_dist(p._x, p._y, obj) <= 960.0 / tps;
+							})
+							|| (object::previous && object::previous->linked
+								&& std::any_of(object::previous->linked->members.begin(), object::previous->linked->members.end(),
+									[obj](object* o) { return o == &obj; })))
+							object::invalidated.push_back(&obj);
+					}
 					for (int i = 1; i < res::objects.size(); i++) {
 						object& obj = res::objects.data()[i];
 						if (std::any_of(object::invalidated.begin(), object::invalidated.end(), [obj, tps](object* other) {
-							return ((int)obj.type < (int)object::enum_type::GLASS_BLOCK
-									|| (int)obj.type >(int)object::enum_type::FIXED_SPLITTER)
-								&& distance(obj.midx(), obj.midy(), other->midx(), other->midy()) < 320.0 / tps;
-							})
-							|| std::any_of(photon::photons.begin(), photon::photons.end(), [obj, tps](photon p) {
-							return ((int)obj.type < (int)object::enum_type::GLASS_BLOCK
-									|| (int)obj.type >(int)object::enum_type::FIXED_SPLITTER)
-								&& distance(obj.midx(), obj.midy(), p._x, p._y) < 320.0 / tps;
+							return (int)obj.type && ((int)obj.type < (int)object::enum_type::GLASS_BLOCK
+								|| (int)obj.type > (int)object::enum_type::SPLITTER)
+								&& distance(obj.midx(), obj.midy(), other->midx(), other->midy()) <= 960.0 / tps;
 							}))
 							obj.render(-1);
 					}
 					for (int i = 0; i < res::objects.size(); i++) {
 						object& obj = res::objects.data()[i];
 						if ((int)obj.type >= (int)object::enum_type::GLASS_BLOCK
-							&& (int)obj.type <= (int)object::enum_type::FIXED_SPLITTER)
+							&& (int)obj.type <= (int)object::enum_type::SPLITTER)
 							obj.render(-1);
 					}
 					object::invalidated.clear();
-					if (object::selected)
-						object::selected->border();
+					if (object::selected) {
+						if (object::selected->linked) {
+							for (int i = 0; i < object::selected->linked->members.size(); i++)
+								object::selected->linked->members.data()[i]->border();
+						}
+						else
+							object::selected->border();
+					}
 					for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end(); ++it)
 						it->render();
 				}
 				else {
+					if (object::invalidate_all)
+						gui::frame = 0;
 					object::invalidated.clear();
 					object::invalidate_all = false;
 					glClear(GL_COLOR_BUFFER_BIT);
 					for (int layer = 0; layer < 7; layer++)
 						for (int i = 0; i < res::objects.size(); i++)
 							res::objects.data()[i].render(layer);
-					if (object::selected)
-						object::selected->border();
+					if (object::selected) {
+						if (object::selected->linked) {
+							for (int i = 0; i < object::selected->linked->members.size(); i++)
+								object::selected->linked->members.data()[i]->border();
+						}
+						else
+							object::selected->border();
+					}
 					for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end(); ++it)
 						it->render();
 				}
@@ -295,8 +437,11 @@ void key_cb(GLFWwindow* window, int key, int scancode, int action, int mods) {
 					for (int i = index; i < gui::elements.size(); i++)
 						gui::elements[i]->visible = false;
 				}
-				else if (gamestate::started)
+				else if (gamestate::started) {
+					glClear(GL_COLOR_BUFFER_BIT);
+					gui::frame = -1;
 					gui::menu = false;
+				}
 			}
 		}
 		else
@@ -306,12 +451,13 @@ void key_cb(GLFWwindow* window, int key, int scancode, int action, int mods) {
 	}
 	if (action != GLFW_PRESS)
 		return;
-	int step;
-	switch (object::selected->type) {
-	case object::enum_type::MIRROR:			step = 1;	break;
-	case object::enum_type::GLASS_BLOCK:	step = 2;	break;
-	case object::enum_type::SPLITTER:		step = 4;	break;
-	default:								step = 0;	break;
+	int step = 0;
+	if (object::selected) {
+		switch (object::selected->type) {
+		case object::enum_type::MIRROR:			step = 1;	break;
+		case object::enum_type::GLASS_BLOCK:	step = 2;	break;
+		default:											break;
+		}
 	}
 	if (key == keybinds::up || key == keybinds::left
 		|| key == keybinds::down || key == keybinds::right) {
@@ -322,14 +468,14 @@ void key_cb(GLFWwindow* window, int key, int scancode, int action, int mods) {
 		if (object::selected) {
 			int dir = (int)object::selected->orientation;
 			object::selected->orientation = (object::enum_orientation)(dir == 16 - step ? 0 : dir + step);
-			object::invalidated.push_back(object::selected);
+			object::invalidate_all = true;
 		}
 	}
 	else if (key == keybinds::cw) {
 		if (object::selected) {
 			int dir = (int)object::selected->orientation;
 			object::selected->orientation = (object::enum_orientation)(dir == 0 ? 16 - step : dir - step);
-			object::invalidated.push_back(object::selected);
+			object::invalidate_all = true;
 		}
 	}
 	else if (key == keybinds::perp) {
@@ -338,16 +484,32 @@ void key_cb(GLFWwindow* window, int key, int scancode, int action, int mods) {
 			if (dir > 15)
 				dir -= 16;
 			object::selected->orientation = (object::enum_orientation)dir;
-			object::invalidated.push_back(object::selected);
+			object::invalidate_all = true;
 		}
 	}
 	else if (key == keybinds::toggle) {
 		if (object::selected && !object::selected->moving) {
 			object::selected->toggle = !object::selected->toggle;
-			if (object::selected->type == object::enum_type::MOVING_WALL
-				|| object::selected->type == object::enum_type::MOVING_BLOCK
-				|| object::selected->type == object::enum_type::MOVING_CRYSTAL)
-				object::selected->moving = true;
+			if (object::selected->linked) {
+				for (int i = 0; i < object::selected->linked->members.size(); i++) {
+					object* obj = object::selected->linked->members.data()[i];
+					obj->toggle = object::selected->toggle;
+					if (obj->type == object::enum_type::MOVING_WALL
+						|| obj->type == object::enum_type::MOVING_BLOCK
+						|| obj->type == object::enum_type::MOVING_CRYSTAL)
+						obj->moving = true;
+					else
+						object::invalidate_all = true;
+				}
+			}
+			else {
+				if (object::selected->type == object::enum_type::MOVING_WALL
+					|| object::selected->type == object::enum_type::MOVING_BLOCK
+					|| object::selected->type == object::enum_type::MOVING_CRYSTAL)
+					object::selected->moving = true;
+				else
+					object::invalidate_all = true;
+			}
 		}
 	}
 	else if (key == GLFW_KEY_ESCAPE) {
@@ -357,4 +519,39 @@ void key_cb(GLFWwindow* window, int key, int scancode, int action, int mods) {
 		out.close();
 		gui::menu = true;
 	}
+}
+
+// Debugging function
+static bool list_nodes(node* root, int depth) {
+	std::vector<photon*> items;
+	std::vector<node*> children;
+	if (root) {
+		items = root->items;
+		children = root->children;
+	}
+	else {
+		for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end(); ++it)
+			if (it->parent == NULL)
+				items.push_back(&*it);
+		for (std::list<node>::iterator it = photon::nodes.begin(); it != photon::nodes.end(); ++it)
+			if (it->parent == NULL)
+				children.push_back(&*it);
+	}
+	for (int i = 0; i < depth; i++)
+		std::cout << "  ";
+	if (root)
+		std::cout << (root->type == node::enum_node::SPDC ? "SPDC" : "SUPERPOS") << std::endl;
+	else
+		std::cout << "ROOT" << std::endl;
+	for (int i = 0; i < items.size(); i++) {
+		for (int i = 0; i <= depth; i++)
+			std::cout << "  ";
+		std::cout << items.data()[i]->id << " " << items.data()[i]->split;
+		if (items.data()[i]->direction == photon::enum_direction::NONE)
+			std::cout << " !";
+		std::cout << std::endl;
+	}
+	for (int i = 0; i < children.size(); i++)
+		list_nodes(children.data()[i], depth + 1);
+	return false;
 }

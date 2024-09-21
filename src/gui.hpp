@@ -13,10 +13,10 @@ namespace gui {
 		int x, y, width;
 		std::string text;
 		bool visible;
-		glm::vec4 foreground;
+		vec foreground;
 
 		element(int x, int y, int width, bool visible,
-			std::string text, glm::vec4 foreground);
+			std::string text, vec foreground);
 
 		virtual void handler(enum_event, int, int, int) = 0;
 		virtual void render(void) = 0;
@@ -28,7 +28,7 @@ namespace gui {
 		GLfloat noise;
 
 		panel(int x, int y, int width, int height, bool visible,
-			glm::vec4 colour, GLfloat noise);
+			vec colour, GLfloat noise);
 	
 		inline void handler(enum_event, int, int, int) {}
 		void render(void);
@@ -39,7 +39,7 @@ namespace gui {
 		int size;
 		
 		label(int x, int y, int width, bool visible,
-			std::string text, glm::vec4 foreground, int size);
+			std::string text, vec foreground, int size);
 
 		inline void handler(enum_event, int, int, int) {}
 		void render(void);
@@ -49,12 +49,12 @@ namespace gui {
 	public:
 		int height, margin;
 		int state;
-		glm::vec4 inactive, hover, click;
+		vec inactive, hover, click;
 		void (*event)(void);
 
 		button(int x, int y, int width, int height,
 			bool visible, int margin, std::string text,
-			glm::vec4 foreground, glm::vec4 background, void (*event)(void));
+			vec foreground, vec background, void (*event)(void));
 
 		virtual void handler(enum_event type, int a, int b, int c);
 		void render(void);
@@ -65,7 +65,7 @@ namespace gui {
 		int* key;
 
 		keybind_button(int x, int y, bool visible, int* key,
-			glm::vec4 foreground, glm::vec4 background);
+			vec foreground, vec background);
 
 		void handler(enum_event type, int a, int b, int c);
 		void render(void);
@@ -77,11 +77,11 @@ namespace gui {
 		int state;
 		size_t cursor_pos;
 		double last_clicked;
-		glm::vec4 inactive, active;
+		vec inactive, active;
 
 		textbox(int x, int y, int width, int height,
 			bool visible, int margin, std::string text,
-			glm::vec4 foreground, glm::vec4 background);
+			vec foreground, vec background);
 
 		void handler(enum_event type, int a, int b, int c);
 		void render(void);
@@ -92,6 +92,7 @@ namespace gui {
 
 	std::string time(double t);
 
+	extern size_t frame;
 	extern bool menu;
 	extern bool quit;
 	extern std::vector<element*> elements;
