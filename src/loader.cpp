@@ -1,12 +1,14 @@
-#include <filesystem>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <sstream>
 
 #include "head.hpp"
 
 namespace res::loader {
 	std::vector<rect> textures[32];
 	std::vector<box> hitboxes[32];
-	std::vector<std::vector<object>> levels;
+	std::vector<level> levels;
 }
 
 // Some #defines to make life easier
@@ -49,29 +51,142 @@ namespace res::loader {
 #define HBX_BOMB    	NULL
 #define HBX_SENSOR  	NULL
 
-void res::loader::load_obj(void) {
-	levels.clear();
-	levels.push_back(std::vector<object>());
-	levels.back().push_back(object(0.0, 0.0, 1, 1,
-		object::enum_orientation::NONE, object::enum_type::NONE, TEX_PHOTON, NULL,
-		(int)photon::enum_direction::E));
+std::vector<rect>* res::loader::get_tex(object::enum_type type) {
+	switch (type) {
+	case object::enum_type::WALL:
+		return TEX_WALL;
+	case object::enum_type::DOOR:
+		return TEX_DOOR;
+	case object::enum_type::MOVING_WALL:
+		return TEX_MOV_WALL;
+	case object::enum_type::MIRROR:
+		return TEX_ROT_MIRROR;
+	case object::enum_type::DIAGONAL_MIRROR:
+		return TEX_DMIRROR;
+	case object::enum_type::MIRROR_BLOCK:
+		return TEX_MIRRORBLOCK;
+	case object::enum_type::MIRROR_DOOR:
+		return TEX_MIRRORDOOR;
+	case object::enum_type::GLASS_BLOCK:
+		return TEX_ROT_MIRROR;
+	case object::enum_type::FIXED_BLOCK:
+		return TEX_FBLOCK;
+	case object::enum_type::MOVING_BLOCK:
+		return TEX_MOV_BLOCK;
+	case object::enum_type::PRISM:
+		return TEX_PRISM;
+	case object::enum_type::SPDC_CRYSTAL:
+		return TEX_SPDC;
+	case object::enum_type::MOVING_CRYSTAL:
+		return TEX_MOV_SPDC;
+	case object::enum_type::SPLITTER:
+		return TEX_SPLITTER;
+	case object::enum_type::BOMB:
+		return TEX_BOMB;
+	case object::enum_type::SENSOR:
+		return TEX_SENSOR;
+	default:
+		return NULL;
+	}
 }
 
-void res::loader::load_level(int level) {
+std::vector<box>* res::loader::get_hbx(object::enum_type type) {
+	switch (type) {
+	case object::enum_type::MIRROR:
+		return HBX_ROT_MIRROR;
+	case object::enum_type::DIAGONAL_MIRROR:
+		return HBX_DMIRROR;
+	case object::enum_type::GLASS_BLOCK:
+		return HBX_ROT_BLOCK;
+	case object::enum_type::PRISM:
+		return HBX_PRISM;
+	case object::enum_type::SPLITTER:
+		return HBX_SPLITTER;
+	default:
+		return NULL;
+	}
+}
+
+void res::loader::load_default(void) {
+	levels.clear();
+	levels.push_back(level());
+	levels.back().objects.push_back(object(0.0, 0.0, 1, 1,
+		object::enum_orientation::NONE, object::enum_type::NONE, TEX_PHOTON, NULL,
+		(int)photon::enum_direction::E));
+	levels.back().objects.push_back(object(0.0, 0.0, 640, 360,
+		object::enum_orientation::NONE, object::enum_type::NONE, NULL, NULL, 0));
+}
+
+bool res::loader::load_from_file(std::string path) {
+	if (!std::filesystem::is_regular_file(path))
+		return false;
+	levels.clear();
+	std::ifstream in(path);
+	std::string str;
+	while (std::getline(in, str)) {
+		int x, y, dir;
+		if (str.data()[0] == ' ') {
+			levels.push_back(level());
+			levels.back().hint = str.substr(1);
+			in >> x >> y >> dir;
+			if (in.fail() || dir < 0 || dir >= (int)photon::enum_direction::NONE) {
+				in.close();
+				return false;
+			}
+			levels.back().objects.push_back(object(x, y, 1, 1,
+				object::enum_orientation::NONE, object::enum_type::NONE, TEX_PHOTON, NULL, dir));
+			levels.back().objects.push_back(object(0.0, 0.0, 640, 360,
+				object::enum_orientation::NONE, object::enum_type::NONE, NULL, NULL, 0));
+			std::getline(in, str);
+			continue;
+		}
+		int type;
+		std::istringstream iss(str);
+		iss >> type >> x >> y >> dir;
+		if (iss.fail() || type < 0 || type > (int)object::enum_type::NONE
+			|| dir < 0 || dir > (int)object::enum_orientation::NONE) {
+			in.close();
+			return false;
+		}
+		object::enum_type t = (object::enum_type)type;
+		levels.back().objects.push_back(object(x, y, 20, 20,
+			(object::enum_orientation)dir, t,
+			res::loader::get_tex(t), res::loader::get_hbx(t), 0));
+		if (t == object::enum_type::MOVING_WALL
+			|| t == object::enum_type::MOVING_BLOCK
+			|| t == object::enum_type::MOVING_CRYSTAL) {
+			int x2, y2, data;
+			iss >> x2 >> y2 >> data;
+			if (iss.fail() || data < 0) {
+				in.close();
+				return false;
+			}
+			levels.back().objects.back().x2 = x2;
+			levels.back().objects.back().y2 = y2;
+			levels.back().objects.back().data = data;
+		}
+	}
+	in.close();
+	return true;
+}
+
+void res::loader::load_level(int level, bool randomize_orientation) {
+	if (level >= res::loader::levels.size())
+		return;
 	photon::deleting.clear();
 	photon::nodes.clear();
 	photon::photons.clear();
 	object::invalidated.clear();
 	res::objects.clear();
-	res::objects.resize(res::loader::levels[level].size() - 1);
-	memcpy(res::objects.data(),
-		res::loader::levels.data()[level].data() + 1,
-		std::min(res::objects.size(), res::loader::levels.data()[level].size() - 1) * sizeof(object));
+	res::objects.resize(res::loader::levels[level].objects.size() - 1);
+	std::memcpy(res::objects.data(),
+		res::loader::levels.data()[level].objects.data() + 1,
+		std::min(res::objects.size(), res::loader::levels.data()[level].objects.size() - 1) * sizeof(object));
 	photon::photons.push_back(photon(
 		TEX(0),
-		res::loader::levels.data()[level].data()[0].x,
-		res::loader::levels.data()[level].data()[0].y,
-		(photon::enum_direction)res::loader::levels.data()[level].data()[0].data,
+		res::loader::levels.data()[level].objects.data()[0].x,
+		res::loader::levels.data()[level].objects.data()[0].y,
+		(photon::enum_direction)res::loader::levels.data()[level].objects.data()[0].data,
 		0, 0,
 		NULL
 	));
@@ -89,7 +204,7 @@ void res::loader::load_level(int level) {
 			it->add(&obj);
 		}
 	}
-	object::selected = &res::objects.data()[1];
+	object::selected = res::objects.size() > 1 ? &res::objects.data()[1] : NULL;
 }
 
 namespace gamestate {

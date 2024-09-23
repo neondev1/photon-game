@@ -4,7 +4,9 @@
 #include <fstream>
 #include <thread>
 
+#ifdef _DEBUG
 #include <iostream>
+#endif
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -27,14 +29,30 @@ void click_cb(GLFWwindow* window, int button, int action, int mods);
 void text_cb(GLFWwindow* window, unsigned codepoint);
 void key_cb(GLFWwindow* window, int key, int scancode, int action, int mods);
 
-GLFWwindow* gui::window;
-
 // Debugging function
 static bool list_nodes(node* root, int depth);
 
 int main(void) {
 	srand((unsigned)time(NULL));
-	if (fs::is_regular_file(fs::path("./settings"))) {
+	if (!glfwInit())
+		exit(EXIT_FAILURE);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
+	gui::window = glfwCreateWindow(1280, 720, "Photon", NULL, NULL);
+	if (gui::window == NULL) {
+		glfwTerminate();
+		exit(EXIT_FAILURE);
+	}
+	glfwMakeContextCurrent(gui::window);
+	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+		glfwDestroyWindow(gui::window);
+		glfwTerminate();
+		exit(EXIT_FAILURE);
+	}
+	glViewport(0, 0, 1280, 720);
+	if (fs::is_regular_file("./settings")) {
 		std::ifstream in("./settings");
 		in >> keybinds::up >> keybinds::left >> keybinds::down >> keybinds::right;
 		in >> keybinds::ccw >> keybinds::cw >> keybinds::perp >> keybinds::toggle;
@@ -60,30 +78,13 @@ int main(void) {
 	}
 	else
 		gamestate::save.clear();
-	if (!glfwInit())
-		exit(EXIT_FAILURE);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
-	gui::window = glfwCreateWindow(1280, 720, "Photon", NULL, NULL);
-	if (gui::window == NULL) {
-		glfwTerminate();
-		exit(EXIT_FAILURE);
-	}
-	glfwMakeContextCurrent(gui::window);
-	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-		glfwDestroyWindow(gui::window);
-		glfwTerminate();
-		exit(EXIT_FAILURE);
-	}
-	glViewport(0, 0, 1280, 720);
 	res::load_vao();
 	gui::load_font();
 	gui::load_gui();
 	res::loader::load_tex();
 	res::loader::load_hbx();
-	res::loader::load_obj();
+	if (!res::loader::load_from_file("./level"))
+		res::loader::load_default();
 	res::shaders::load();
 	glfwSetCursorPosCallback(gui::window, move_cb);
 	glfwSetMouseButtonCallback(gui::window, click_cb);
@@ -94,12 +95,14 @@ int main(void) {
 	constexpr std::chrono::seconds zero(0);
 	constexpr std::chrono::seconds one(1);
 	int tps = 64;
+#ifdef _DEBUG
 	/*
 	// Debugging code, comment this out when not debugging logic
 	while (1) {
 		std::string s;
 		std::cin >> s;
-		std::transform(s.begin(), s.end(), s.begin(), [](char c) { return std::tolower(c); });
+		std::transform(s.begin(), s.end(), s.begin(),
+			[](char c) { return std::tolower(c); });
 		int fails = gamestate::failures;
 		if (s == "add")
 			photon::photons.push_back(photon(NULL, 0.0, 0.0, photon::enum_direction::E, 0, 0, NULL));
@@ -147,6 +150,7 @@ int main(void) {
 		list_nodes(NULL, 0);
 	}
 	*/
+#endif
 	// This program is probably about as stable as the economy
 	// of the Weimar Republic during the hyperinflation of 1923
 	while (!glfwWindowShouldClose(gui::window)) {
@@ -169,8 +173,11 @@ int main(void) {
 						len = it->_tick;
 				}
 				int fails = gamestate::failures, level = gamestate::level;
-				for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end();)
+				for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end();) {
 					it->tick(tps, len, &it);
+					if (gamestate::level > level)
+						break;
+				}
 				if (gamestate::level > level) {
 					if (gamestate::level >= res::loader::levels.size()) {
 						photon::deleting.clear();
@@ -196,7 +203,7 @@ int main(void) {
 					glClear(GL_COLOR_BUFFER_BIT);
 					glfwSwapBuffers(gui::window);
 					std::this_thread::sleep_for(one);
-					res::loader::load_level(gamestate::level);
+					res::loader::load_level(gamestate::level, true);
 					gui::frame = -1;
 				}
 				else if (gamestate::failures == fails) {
@@ -212,7 +219,7 @@ int main(void) {
 						glClear(GL_COLOR_BUFFER_BIT);
 						glfwSwapBuffers(gui::window);
 						std::this_thread::sleep_for(one);
-						res::loader::load_level(gamestate::level);
+						res::loader::load_level(gamestate::level, true);
 						gui::frame = -1;
 					}
 					else {
@@ -259,7 +266,7 @@ int main(void) {
 					glClear(GL_COLOR_BUFFER_BIT);
 					glfwSwapBuffers(gui::window);
 					std::this_thread::sleep_for(one);
-					res::loader::load_level(gamestate::level);
+					res::loader::load_level(gamestate::level, true);
 					gui::frame = -1;
 				}
 			}
@@ -301,8 +308,8 @@ int main(void) {
 					for (int i = 1; i < res::objects.size(); i++) {
 						object& obj = res::objects.data()[i];
 						if (std::any_of(photon::photons.begin(), photon::photons.end(), [obj, tps](photon p) {
-							return (int)obj.type && ((int)obj.type < (int)object::enum_type::GLASS_BLOCK
-								|| (int)obj.type >(int)object::enum_type::SPLITTER)
+							return obj.type != object::enum_type::NONE && ((int)obj.type < (int)object::enum_type::GLASS_BLOCK
+								|| (int)obj.type > (int)object::enum_type::SPLITTER)
 								&& obj_dist(p._x, p._y, obj) <= 960.0 / tps;
 							})
 							|| (object::previous && object::previous->linked
@@ -313,7 +320,7 @@ int main(void) {
 					for (int i = 1; i < res::objects.size(); i++) {
 						object& obj = res::objects.data()[i];
 						if (std::any_of(object::invalidated.begin(), object::invalidated.end(), [obj, tps](object* other) {
-							return (int)obj.type && ((int)obj.type < (int)object::enum_type::GLASS_BLOCK
+							return obj.type != object::enum_type::NONE && ((int)obj.type < (int)object::enum_type::GLASS_BLOCK
 								|| (int)obj.type > (int)object::enum_type::SPLITTER)
 								&& distance(obj.midx(), obj.midy(), other->midx(), other->midy()) <= 960.0 / tps;
 							}))
@@ -521,6 +528,18 @@ void key_cb(GLFWwindow* window, int key, int scancode, int action, int mods) {
 	}
 }
 
+namespace keybinds {
+	int up = GLFW_KEY_W;
+	int left = GLFW_KEY_A;
+	int down = GLFW_KEY_S;
+	int right = GLFW_KEY_D;
+	int ccw = GLFW_KEY_LEFT_BRACKET;
+	int cw = GLFW_KEY_RIGHT_BRACKET;
+	int perp = GLFW_KEY_BACKSLASH;
+	int toggle = GLFW_KEY_SLASH;
+}
+
+#ifdef _DEBUG
 // Debugging function
 static bool list_nodes(node* root, int depth) {
 	std::vector<photon*> items;
@@ -555,3 +574,4 @@ static bool list_nodes(node* root, int depth) {
 		list_nodes(children.data()[i], depth + 1);
 	return false;
 }
+#endif

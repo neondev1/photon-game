@@ -19,16 +19,7 @@
 
 namespace fs = std::filesystem;
 
-namespace keybinds {
-	int up  	= GLFW_KEY_W;
-	int left	= GLFW_KEY_A;
-	int down	= GLFW_KEY_S;
-	int right	= GLFW_KEY_D;
-	int ccw 	= GLFW_KEY_LEFT_BRACKET;
-	int cw  	= GLFW_KEY_RIGHT_BRACKET;
-	int perp	= GLFW_KEY_BACKSLASH;
-	int toggle	= GLFW_KEY_SLASH;
-}
+GLFWwindow* gui::window;
 
 namespace gui {
 	size_t frame = 0;
@@ -73,7 +64,7 @@ void gui::load_gui(void) {
 				gamestate::started = true;
 				gui::frame = -1;
 				gui::menu = false;
-				res::loader::load_level(0);
+				res::loader::load_level(gamestate::level, true);
 			}
 			out.close();
 		}

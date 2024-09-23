@@ -1,10 +1,11 @@
 #ifndef _HEAD_HPP_
 #define _HEAD_HPP_
 
-// Yes, I used 4 different data structures for this
+// Yes, I used 5 different data structures in this thing
 // Why did I use them? I don't even know anymore
 #include <deque>
 #include <list>
+#include <map>
 #include <unordered_set>
 #include <vector>
 
@@ -179,13 +180,21 @@ namespace res {
 		void load(void);
 	}
 	namespace loader {
+		class level {
+		public:
+			std::string hint;
+			std::vector<object> objects;
+		};
 		extern std::vector<rect> textures[32];
 		extern std::vector<box> hitboxes[32];
-		extern std::vector<std::vector<object>> levels;
+		extern std::vector<level> levels;
 		void load_tex(void);
 		void load_hbx(void);
-		void load_obj(void);
-		void load_level(int level);
+		void load_default(void);
+		bool load_from_file(std::string path);
+		void load_level(int level, bool randomize_orientation);
+		std::vector<rect>* get_tex(object::enum_type type);
+		std::vector<box>* get_hbx(object::enum_type type);
 	}
 	void load_vao(void);
 }
