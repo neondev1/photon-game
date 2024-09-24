@@ -56,14 +56,14 @@ int main(void) {
 		std::ifstream in("./settings");
 		in >> keybinds::up >> keybinds::left >> keybinds::down >> keybinds::right;
 		in >> keybinds::ccw >> keybinds::cw >> keybinds::perp >> keybinds::toggle;
-		in >> gamestate::save;
+		in >> keybinds::hint >> gamestate::save;
 		in.close();
 	}
 	else {
 		std::ofstream out("./settings");
 		out << keybinds::up << '\n' << keybinds::left << '\n' << keybinds::down << '\n' << keybinds::right << '\n';
-		out << keybinds::ccw << '\n' << keybinds::cw << '\n' << keybinds::perp << '\n' << keybinds::toggle;
-		out << std::endl;
+		out << keybinds::ccw << '\n' << keybinds::cw << '\n' << keybinds::perp << '\n' << keybinds::toggle << '\n';
+		out << keybinds::hint << std::endl;
 		out.close();
 	}
 	if (!gamestate::save.empty() && fs::is_regular_file(gamestate::save)) {
@@ -162,7 +162,7 @@ int main(void) {
 		if (cur >= next) {
 			if (gui::menu)
 				next += 1.0 / tps;
-			else {
+			else if (!gamestate::hint) {
 				double len = 1.0;
 				for (int i = 0; i < res::objects.size(); i++)
 					if (res::objects.data()[i].moving)
@@ -193,13 +193,15 @@ int main(void) {
 						gamestate::started = false;
 						gui::elements[1]->text = "=SUCCESS=";
 						int index = 0;
-						for (; index < gui::elements.size() - 3
-							&& gui::elements.data()[index]->text.find("Fails: ") == std::string::npos; index++);
+						for (; index < gui::elements.size() - 1
+							&& gui::elements.data()[index]->text.find("Fails:") == std::string::npos; index++);
 						gui::elements.data()[index]->text = std::string("Fails: ") + std::to_string(gamestate::failures);
 						gui::elements.data()[index]->visible = true;
 						gui::elements.data()[index + 2]->text = std::string("Time: ") + gui::time(gamestate::time);
 						gui::elements.data()[index + 2]->visible = true;
+						gui::menu = true;
 					}
+					std::this_thread::sleep_for(one);
 					glClear(GL_COLOR_BUFFER_BIT);
 					glfwSwapBuffers(gui::window);
 					std::this_thread::sleep_for(one);
@@ -216,8 +218,6 @@ int main(void) {
 					}
 					if (fail || photon::photons.empty()) {
 						gamestate::failures++;
-						glClear(GL_COLOR_BUFFER_BIT);
-						glfwSwapBuffers(gui::window);
 						std::this_thread::sleep_for(one);
 						res::loader::load_level(gamestate::level, true);
 						gui::frame = -1;
@@ -239,6 +239,7 @@ int main(void) {
 							photon::deleting.clear();
 						}
 						next += len / tps;
+						gamestate::time += len / tps;
 					}
 				}
 				else if (gamestate::hardcore) {
@@ -256,15 +257,14 @@ int main(void) {
 					gui::elements[1]->text = "GAME OVER";
 					int index = 0;
 					for (; index < gui::elements.size() - 2
-						&& gui::elements.data()[index]->text.find("Level: ") == std::string::npos; index++);
+						&& gui::elements.data()[index]->text.find("Level:") == std::string::npos; index++);
 					gui::elements.data()[index]->text = std::string("Level: ") + std::to_string(gamestate::level);
 					gui::elements.data()[index]->visible = true;
 					gui::elements.data()[index + 1]->text = std::string("Time: ") + gui::time(gamestate::time);
 					gui::elements.data()[index + 1]->visible = true;
+					gui::menu = true;
 				}
 				else {
-					glClear(GL_COLOR_BUFFER_BIT);
-					glfwSwapBuffers(gui::window);
 					std::this_thread::sleep_for(one);
 					res::loader::load_level(gamestate::level, true);
 					gui::frame = -1;
@@ -276,6 +276,11 @@ int main(void) {
 					glClear(GL_COLOR_BUFFER_BIT);
 					for (int i = 0; i < gui::elements.size(); i++)
 						gui::elements.data()[i]->render();
+				}
+				else if (gamestate::hint && !res::loader::levels.data()[gamestate::level].hint.empty()) {
+					glClear(GL_COLOR_BUFFER_BIT);
+					render_text(res::loader::levels.data()[gamestate::level].hint, 50, 50, 1180, 3, false, 0, vec(1.0f, 1.0f, 1.0f, 1.0f));
+					render_text("Press any key to dismiss", 50, 637, 1180, 3, false, 0, vec(1.0f, 1.0f, 1.0f, 1.0f));
 				}
 				else if ((gui::frame % 10 - gui::frame % 2) && !object::invalidate_all) {
 					for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end(); ++it) {
@@ -386,7 +391,7 @@ int main(void) {
 	std::ofstream cfg("./settings", std::ios::trunc);
 	cfg << keybinds::up << '\n' << keybinds::left << '\n' << keybinds::down << '\n' << keybinds::right << '\n';
 	cfg << keybinds::ccw << '\n' << keybinds::cw << '\n' << keybinds::perp << '\n' << keybinds::toggle << '\n';
-	cfg << gamestate::save << std::endl;
+	cfg << keybinds::hint << '\n' << gamestate::save << std::endl;
 	cfg.close();
 	for (int i = 0; i < gui::elements.size(); i++)
 		delete gui::elements.data()[i];
@@ -458,6 +463,10 @@ void key_cb(GLFWwindow* window, int key, int scancode, int action, int mods) {
 	}
 	if (action != GLFW_PRESS)
 		return;
+	if (gamestate::hint) {
+		gamestate::hint = false;
+		return;
+	}
 	int step = 0;
 	if (object::selected) {
 		switch (object::selected->type) {
@@ -519,6 +528,8 @@ void key_cb(GLFWwindow* window, int key, int scancode, int action, int mods) {
 			}
 		}
 	}
+	else if (key == keybinds::hint)
+		gamestate::hint = true;
 	else if (key == GLFW_KEY_ESCAPE) {
 		std::ofstream out(gamestate::save, std::ios::trunc);
 		out << (gamestate::hardcore ? 'h' : 'n') << '\n' << gamestate::level << '\n';
@@ -537,6 +548,7 @@ namespace keybinds {
 	int cw = GLFW_KEY_RIGHT_BRACKET;
 	int perp = GLFW_KEY_BACKSLASH;
 	int toggle = GLFW_KEY_SLASH;
+	int hint = GLFW_KEY_H;
 }
 
 #ifdef _DEBUG

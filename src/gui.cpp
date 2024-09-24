@@ -9,11 +9,11 @@
 
 #include "gui.hpp"
 
-#define FONT_SPACEBAR	16
-#define FONT_CURSOR 	17
-#define FONT_TCOLON 	18
-#define FONT_TDECIMAL	19
-#define FONT_O_UMLAUT	20
+#define FONT_SPACEBAR	(char)16
+#define FONT_CURSOR 	(char)17
+#define FONT_TCOLON 	(char)18
+#define FONT_TDECIMAL	(char)19
+#define FONT_O_UMLAUT	(char)20
 
 #define STR(x) std::string({(char)x})
 
@@ -38,7 +38,7 @@ void gui::load_gui(void) {
 		fore, back, []() {
 		if (gamestate::hardcore && gamestate::failures)
 			return;
-		if (gamestate::level > res::loader::levels.size())
+		if (gamestate::level >= res::loader::levels.size())
 			return;
 		if (gamestate::started) {
 			glClear(GL_COLOR_BUFFER_BIT);
@@ -81,12 +81,13 @@ void gui::load_gui(void) {
 		for (; index < gui::elements.size() - 1 && gui::elements.data()[index]->text != "<BACK"; index++);
 		for (int i = 1; i < index; i++)
 			gui::elements[i]->visible = false;
-		for (int i = index; i < index + 19; i++)
+		for (int i = index; i < index + 21; i++)
 			gui::elements[i]->visible = true;
-		for (int i = index + 19; i < gui::elements.size(); i++)
+		for (int i = index + 21; i < gui::elements.size(); i++)
 			gui::elements[i]->visible = false;
 		if (keybinds::up == 0 || keybinds::left == 0 || keybinds::down == 0 || keybinds::right == 0
-			|| keybinds::ccw == 0 || keybinds::cw == 0 || keybinds::perp == 0 || keybinds::toggle == 0) {
+			|| keybinds::ccw == 0 || keybinds::cw == 0 || keybinds::perp == 0 || keybinds::toggle == 0
+			|| keybinds::hint == 0) {
 			index = 0;
 			for (; index < gui::elements.size() - 1
 				&& gui::elements.data()[index]->text.find("Missing keybinds") == std::string::npos; index++);
@@ -121,7 +122,7 @@ void gui::load_gui(void) {
 				std::ofstream cfg("./settings", std::ios::trunc);
 				cfg << keybinds::up << '\n' << keybinds::left << '\n' << keybinds::down << '\n' << keybinds::right << '\n';
 				cfg << keybinds::ccw << '\n' << keybinds::cw << '\n' << keybinds::perp << '\n' << keybinds::toggle << '\n';
-				cfg << gamestate::save << std::endl;
+				cfg << keybinds::hint << '\n' << gamestate::save << std::endl;
 				cfg.close();
 			}
 			in.close();
@@ -155,7 +156,7 @@ void gui::load_gui(void) {
 		std::ofstream cfg("./settings", std::ios::trunc);
 		cfg << keybinds::up << '\n' << keybinds::left << '\n' << keybinds::down << '\n' << keybinds::right << '\n';
 		cfg << keybinds::ccw << '\n' << keybinds::cw << '\n' << keybinds::perp << '\n' << keybinds::toggle << '\n';
-		cfg << gamestate::save << std::endl;
+		cfg << keybinds::hint << '\n' << gamestate::save << std::endl;
 		cfg.close();
 	}));
 	gui::elements.push_back(new gui::button(855, 540, 325, 42, true, 10, "NEW HARDCORE SAVE",
@@ -180,7 +181,7 @@ void gui::load_gui(void) {
 		std::ofstream cfg("./settings", std::ios::trunc);
 		cfg << keybinds::up << '\n' << keybinds::left << '\n' << keybinds::down << '\n' << keybinds::right << '\n';
 		cfg << keybinds::ccw << '\n' << keybinds::cw << '\n' << keybinds::perp << '\n' << keybinds::toggle << '\n';
-		cfg << gamestate::save << std::endl;
+		cfg << keybinds::hint << '\n' << gamestate::save << std::endl;
 		cfg.close();
 	}));
 	gui::elements.push_back(new gui::button(100, 600, 90, 42, true, 10, "QUIT",
@@ -226,15 +227,18 @@ void gui::load_gui(void) {
 	gui::elements.push_back(new gui::keybind_button(550, 390, false, &keybinds::perp, fore, back));
 	gui::elements.push_back(new gui::label(50, 450, 1000, false, "Toggle/Move Object", fore, 2));
 	gui::elements.push_back(new gui::keybind_button(550, 440, false, &keybinds::toggle, fore, back));
+	gui::elements.push_back(new gui::label(50, 500, 1000, false, "Hint", fore, 2));
+	gui::elements.push_back(new gui::keybind_button(550, 490, false, &keybinds::hint, fore, back));
 	gui::elements.push_back(new gui::button(400, 20, 180, 42, false, 10, "RESET ALL", fore, back, []() {
-		keybinds::up		= GLFW_KEY_W;
-		keybinds::left		= GLFW_KEY_A;
-		keybinds::down		= GLFW_KEY_S;
-		keybinds::right		= GLFW_KEY_D;
-		keybinds::ccw		= GLFW_KEY_LEFT_BRACKET;
-		keybinds::cw		= GLFW_KEY_RIGHT_BRACKET;
-		keybinds::perp		= GLFW_KEY_BACKSLASH;
+		keybinds::up    	= GLFW_KEY_W;
+		keybinds::left  	= GLFW_KEY_A;
+		keybinds::down  	= GLFW_KEY_S;
+		keybinds::right 	= GLFW_KEY_D;
+		keybinds::ccw   	= GLFW_KEY_LEFT_BRACKET;
+		keybinds::cw    	= GLFW_KEY_RIGHT_BRACKET;
+		keybinds::perp  	= GLFW_KEY_BACKSLASH;
 		keybinds::toggle	= GLFW_KEY_SLASH;
+		keybinds::hint  	= GLFW_KEY_H;
 		int index = 0;
 		for (; index < gui::elements.size() - 1
 			&& gui::elements.data()[index]->text.find("Missing keybinds") == std::string::npos; index++);
@@ -242,7 +246,7 @@ void gui::load_gui(void) {
 		std::ofstream cfg("./settings", std::ios::trunc);
 		cfg << keybinds::up << '\n' << keybinds::left << '\n' << keybinds::down << '\n' << keybinds::right << '\n';
 		cfg << keybinds::ccw << '\n' << keybinds::cw << '\n' << keybinds::perp << '\n' << keybinds::toggle << '\n';
-		cfg << gamestate::save << std::endl;
+		cfg << keybinds::hint << '\n' << gamestate::save << std::endl;
 		cfg.close();
 	}));
 	// Messages
@@ -252,10 +256,10 @@ void gui::load_gui(void) {
 	gui::elements.push_back(new gui::label(290, 555, 1000, false, "File not found", fore, 1));
 	gui::elements.push_back(new gui::label(290, 555, 1000, false, "Invalid savefile", fore, 1));
 	gui::elements.push_back(new gui::label(100, 660, 1000, false, "This game uses the following libraries:\nGLFW: Copyright (c) 2002-2006 Marcus Geelnard, (c) 2006-2019 Camilla L" + STR(FONT_O_UMLAUT) + "wy; licensed under the zlib License\nGlad: Copyright (c) 2013-2022 David Herberth; licensed under the MIT License", fore, 1));
-	gui::elements.push_back(new gui::label(700, 100, 1000, false, "Fails:", fore, 2));
-	gui::elements.push_back(new gui::label(700, 100, 1000, false, "Level:", fore, 2));
-	gui::elements.push_back(new gui::label(736, 144, 1000, false, "Time:", fore, 2));
-	gui::elements.push_back(new gui::label(50, 500, 1000, false, "Warning: Missing keybinds", vec(1.0f, 0.8f, 0.3f, 1.0f), 2));
+	gui::elements.push_back(new gui::label(700, 100, 1000, false, "Fails: ", fore, 2));
+	gui::elements.push_back(new gui::label(700, 100, 1000, false, "Level: ", fore, 2));
+	gui::elements.push_back(new gui::label(718, 144, 1000, false, "Time: ", fore, 2));
+	gui::elements.push_back(new gui::label(50, 550, 1000, false, "Warning: Missing keybinds", vec(1.0f, 0.8f, 0.3f, 1.0f), 2));
 }
 
 std::string gui::time(double t) {
@@ -264,9 +268,9 @@ std::string gui::time(double t) {
 	int minutes = (int)((t - hours * 3600.0) / 60.0);
 	int seconds = (int)(t - hours * 3600.0 - minutes * 60.0);
 	int millis = (int)((t - hours * 3600.0 - minutes * 60.0 - seconds) * 1000.0);
-	oss << hours << (char)FONT_TCOLON
-		<< std::setfill('0') << std::setw(2) << minutes << (char)FONT_TCOLON
-		<< std::setw(2) << seconds << (char)FONT_TDECIMAL
+	oss << hours << FONT_TCOLON
+		<< std::setfill('0') << std::setw(2) << minutes << FONT_TCOLON
+		<< std::setw(2) << seconds << FONT_TDECIMAL
 		<< std::setw(3) << millis;
 	return oss.str();
 }
@@ -279,17 +283,17 @@ static void draw(int c, int x, int y, int size, vec colour) {
 		tex = &gui::font[0];
 	else if (c > 127) {
 		switch (c) {
-		case GLFW_KEY_RIGHT:		tex = &gui::font[1];	break;
-		case GLFW_KEY_LEFT:			tex = &gui::font[2];	break;
-		case GLFW_KEY_DOWN:			tex = &gui::font[3];	break;
-		case GLFW_KEY_UP:			tex = &gui::font[4];	break;
+		case GLFW_KEY_RIGHT:    	tex = &gui::font[1];	break;
+		case GLFW_KEY_LEFT:     	tex = &gui::font[2];	break;
+		case GLFW_KEY_DOWN:     	tex = &gui::font[3];	break;
+		case GLFW_KEY_UP:        	tex = &gui::font[4];	break;
 		case GLFW_KEY_LEFT_SHIFT:	tex = &gui::font[5];	break;
 		case GLFW_KEY_RIGHT_SHIFT:	tex = &gui::font[6];	break;
 		case GLFW_KEY_CAPS_LOCK:	tex = &gui::font[6];	break;
 		case GLFW_KEY_BACKSPACE:	tex = &gui::font['\b'];	break;
-		case GLFW_KEY_TAB:			tex = &gui::font['\t'];	break;
-		case GLFW_KEY_ENTER:		tex = &gui::font['\r'];	break;
-		default:					tex = &gui::font[0];	break;
+		case GLFW_KEY_TAB:      	tex = &gui::font['\t'];	break;
+		case GLFW_KEY_ENTER:    	tex = &gui::font['\r'];	break;
+		default:                	tex = &gui::font[0];	break;
 		}
 	}
 	else if (gui::font[c].size() == 0 && c != ' ')
@@ -313,7 +317,7 @@ static void draw(int c, int x, int y, int size, vec colour) {
 	}
 }
 
-static void render_text(std::string text, int x, int y, int width, int size, bool cursor, size_t cursor_pos, vec colour) {
+void render_text(std::string text, int x, int y, int width, int size, bool cursor, size_t cursor_pos, vec colour) {
 	if (width == 0)
 		return;
 	GLint gl_x = x, gl_y = 720 - y - size * 11;
@@ -516,6 +520,7 @@ void gui::keybind_button::handler(enum_event type, int a, int b, int c) {
 				CHECK_KEYBIND(cw, a, key, flag);
 				CHECK_KEYBIND(perp, a, key, flag);
 				CHECK_KEYBIND(toggle, a, key, flag);
+				CHECK_KEYBIND(hint, a, key, flag);
 #undef CHECK_KEYBIND
 				int index = 0;
 				for (; index < gui::elements.size() - 1
@@ -524,7 +529,7 @@ void gui::keybind_button::handler(enum_event type, int a, int b, int c) {
 				std::ofstream cfg("./settings", std::ios::trunc);
 				cfg << keybinds::up << '\n' << keybinds::left << '\n' << keybinds::down << '\n' << keybinds::right << '\n';
 				cfg << keybinds::ccw << '\n' << keybinds::cw << '\n' << keybinds::perp << '\n' << keybinds::toggle << '\n';
-				cfg << gamestate::save << std::endl;
+				cfg << keybinds::hint << '\n' << gamestate::save << std::endl;
 				cfg.close();
 			}
 			double _x = 0, _y = 0;

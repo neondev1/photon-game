@@ -490,10 +490,13 @@ int main(void) {
 			else if (cmd == "preview") {
 				res::loader::load_level(gamestate::level, false);
 				preview = true;
+				glfwFocusWindow(window);
 				break;
 			}
 			else if (cmd == "play") {
+				std::cout << "Press ESC to return to the console." << std::endl;
 				res::loader::load_level(gamestate::level, false);
+				glfwFocusWindow(window);
 				break;
 			}
 			else if (cmd == "credits") {

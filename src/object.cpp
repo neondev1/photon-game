@@ -116,7 +116,7 @@ void object::render(int layer) const {
 		break;
 	}
 	for (int i = 0; i < tex->size(); i++) {
-		rect& quad = tex->data()[i];
+		const rect& quad = tex->data()[i];
 		if (layer >= 0) {
 			if (quad.layer < layer)
 				continue;
@@ -141,8 +141,14 @@ void object::render(int layer) const {
 		glScissor(__x, __y, w, h);
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		glUniform4fv(glGetUniformLocation(res::shaders::rectangle, "colour"),
-			1, quad.colour.ptr());
+		if (type == enum_type::SENSOR && quad.colour == vec(0.3f, 0.9f, 0.6f, 1.0f)) {
+			vec colour = data ? vec(0.3f, 0.9f, 0.6f, 1.0f) : vec(0.8f, 0.9f, 0.2f, 1.0f);
+			glUniform4fv(glGetUniformLocation(res::shaders::rectangle, "colour"),
+				1, colour.ptr());
+		}
+		else
+			glUniform4fv(glGetUniformLocation(res::shaders::rectangle, "colour"),
+				1, quad.colour.ptr());
 		glUniform1f(glGetUniformLocation(res::shaders::rectangle, "noise"), quad.noise);
 		glUniform1f(glGetUniformLocation(res::shaders::rectangle, "pxsize"), (GLfloat)PX_SIZE);
 		glUniform2f(glGetUniformLocation(res::shaders::rectangle, "offset"),

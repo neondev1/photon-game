@@ -190,6 +190,7 @@ void res::loader::load_level(int level, bool randomize_orientation) {
 		0, 0,
 		NULL
 	));
+	gamestate::sensors = 0;
 	object::groups.clear();
 	for (int i = 0; i < res::objects.size(); i++) {
 		object& obj = res::objects.data()[i];
@@ -203,15 +204,26 @@ void res::loader::load_level(int level, bool randomize_orientation) {
 				++it;
 			it->add(&obj);
 		}
+		else if (obj.type == object::enum_type::SENSOR)
+			gamestate::sensors++;
 	}
+	gamestate::activated = 0;
 	object::selected = res::objects.size() > 1 ? &res::objects.data()[1] : NULL;
+	if (!res::loader::levels.data()[level].hint_seen
+		&& !res::loader::levels.data()[level].hint.empty()) {
+		gamestate::hint = true;
+		res::loader::levels.data()[level].hint_seen = true;
+	}
 }
 
 namespace gamestate {
 	bool started = false;
+	bool hint = false;
 	bool hardcore = false;
 	int level = 0;
 	int failures = 0;
+	int sensors = 0;
+	int activated = 0;
 	double time = 0.0;
 	std::string save;
 }

@@ -266,7 +266,7 @@ bool interact(photon* const p, double dist, object* const obj,
 			object::enum_orientation orient;
 			switch (line) {
 			case 0: orient = object::enum_orientation::SE;	break;
-			case 1: orient = object::enum_orientation::SW;	break;	
+			case 1: orient = object::enum_orientation::SW;	break;
 			case 2: orient = object::enum_orientation::N;	break;
 			}
 			tmp.orientation = orient;
@@ -321,27 +321,27 @@ bool interact(photon* const p, double dist, object* const obj,
 		//if (!p->medium || p->medium->type != object::enum_type::SPDC_CRYSTAL)
 		//	p->medium = obj;
 		//else {
-			p->medium = NULL;
-			p->dc++;
-			int dir = (int)p->direction;
-			photon::enum_direction dir1 = (photon::enum_direction)(dir == 0 ? 23 : dir - 1);
-			photon::enum_direction dir2 = (photon::enum_direction)(dir == 23 ? 0 : dir + 1);
-			node* n;
-			if (!p->parent)
-				n = NULL;
-			else if (p->parent->type != node::enum_node::SPDC) {
-				n = p->parent->add(node::enum_node::SPDC);
-				node::move(p, n);
-			}
-			else
-				n = p->parent;
-			photon::photons.push_back(photon(p->texture, p->_x, p->_y, dir1, p->dc, p->split, n));
-			photon* np = &photon::photons.back();
-			if (n)
-				n->items.push_back(np);
-			np->interacted.push_back(obj);
-			np->immune.push_back(tps < 32 ? 1 : 2);
-			p->direction = dir2;
+		p->medium = NULL;
+		p->dc++;
+		int dir = (int)p->direction;
+		photon::enum_direction dir1 = (photon::enum_direction)(dir == 0 ? 23 : dir - 1);
+		photon::enum_direction dir2 = (photon::enum_direction)(dir == 23 ? 0 : dir + 1);
+		node* n;
+		if (!p->parent)
+			n = NULL;
+		else if (p->parent->type != node::enum_node::SPDC) {
+			n = p->parent->add(node::enum_node::SPDC);
+			node::move(p, n);
+		}
+		else
+			n = p->parent;
+		photon::photons.push_back(photon(p->texture, p->_x, p->_y, dir1, p->dc, p->split, n));
+		photon* np = &photon::photons.back();
+		if (n)
+			n->items.push_back(np);
+		np->interacted.push_back(obj);
+		np->immune.push_back(tps < 32 ? 1 : 2);
+		p->direction = dir2;
 		//}
 		break;
 	}
@@ -422,9 +422,125 @@ bool interact(photon* const p, double dist, object* const obj,
 		}
 		return true;
 	}
-	case object::enum_type::SENSOR:
-		gamestate::level++;
+	case object::enum_type::SENSOR: {
+		node* n = p->parent;
+		if (!n) {
+			p->destroy();
+			*iter = photon::photons.erase(*iter);
+		}
+		else if (n->type == node::enum_node::SUPERPOS) {
+			p->destroy();
+			*iter = photon::photons.erase(*iter);
+			int absorbed = 0;
+			for (int i = 0; i < n->items.size(); i++)
+				if (n->items.data()[i]->direction == photon::enum_direction::NONE)
+					absorbed++;
+			if (n->children.size() > 1) {
+				if (!obj->data) {
+					obj->data = 1;
+					gamestate::activated++;
+					if (gamestate::activated >= gamestate::sensors)
+						gamestate::level++;
+				}
+				return true;
+			}
+			else if (n->children.size() == 1) {
+				if (!n->items.empty()) {
+					if (!obj->data) {
+						obj->data = 1;
+						gamestate::activated++;
+						if (gamestate::activated >= gamestate::sensors)
+							gamestate::level++;
+					}
+					return true;
+				}
+				node::move(n->children.front(), n->parent);
+				n->destroy();
+				photon::deleting.insert(n);
+			}
+			else if (n->items.size() != absorbed) {
+				if (n->items.size() > 1) {
+					if (!obj->data) {
+						obj->data = 1;
+						gamestate::activated++;
+						if (gamestate::activated >= gamestate::sensors)
+							gamestate::level++;
+					}
+					return true;
+				}
+				node::move(n->items.front(), n->parent);
+				n->destroy();
+				photon::deleting.insert(n);
+			}
+			else {
+				n->destroy();
+				photon::deleting.insert(n);
+			}
+		}
+		else {
+			node* np = n->parent;
+			if (!np) {
+				p->destroy();
+				*iter = photon::photons.erase(*iter);
+			}
+			n->destroy();
+			photon::deleting.insert(n);
+			int absorbed = 0;
+			for (int i = 0; i < np->items.size(); i++)
+				if (np->items.data()[i]->direction == photon::enum_direction::NONE)
+					absorbed++;
+			if (np->children.size() > 1) {
+				if (!obj->data) {
+					obj->data = 1;
+					gamestate::activated++;
+					if (gamestate::activated >= gamestate::sensors)
+						gamestate::level++;
+				}
+				return true;
+			}
+			else if (np->children.size() == 1) {
+				if (!np->items.empty()) {
+					if (!obj->data) {
+						obj->data = 1;
+						gamestate::activated++;
+						if (gamestate::activated >= gamestate::sensors)
+							gamestate::level++;
+					}
+					return true;
+				}
+				node::move(np->children.front(), np->parent);
+				np->destroy();
+				photon::deleting.insert(np);
+			}
+			else if (np->items.size() != absorbed) {
+				if (np->items.size() > 1) {
+					if (!obj->data) {
+						obj->data = 1;
+						gamestate::activated++;
+						if (gamestate::activated >= gamestate::sensors)
+							gamestate::level++;
+					}
+					return true;
+				}
+				node::move(np->items.front(), np->parent);
+				np->destroy();
+				photon::deleting.insert(np);
+			}
+			else {
+				np->destroy();
+				photon::deleting.insert(np);
+			}
+			if (*iter != photon::photons.end())
+				++(*iter);
+		}
+		if (!obj->data) {
+			obj->data = 1;
+			gamestate::activated++;
+			if (gamestate::activated >= gamestate::sensors)
+				gamestate::level++;
+		}
 		return true;
+	}
 	default: // this shouldn't ever happen
 		for (;;);
 	}
