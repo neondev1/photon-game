@@ -1,11 +1,10 @@
 #ifndef _HEAD_HPP_
 #define _HEAD_HPP_
 
-// Yes, I used 5 different data structures in this thing
+// Yes, I used 4 different data structures in this thing
 // Why did I use them? I don't even know anymore
 #include <deque>
 #include <list>
-#include <map>
 #include <unordered_set>
 #include <vector>
 
@@ -24,8 +23,8 @@ struct vec {
 	union { float z, b, p; };
 	union { float w, a, q; };
 
-	vec(void) : x(0.0f), y(0.0f), z(0.0f), w(0.0f) {}
-	vec(float x, float y, float z, float w) :
+	inline vec(void) : x(0.0f), y(0.0f), z(0.0f), w(0.0f) {}
+	inline vec(float x, float y, float z, float w) :
 		x(x), y(y), z(z), w(w) {}
 
 	inline float const* ptr(void) const { return &x; }
@@ -189,8 +188,9 @@ namespace res {
 			std::string hint;
 			bool hint_seen;
 			std::vector<object> objects;
-			
-			inline level() : hint_seen(false) {}
+			bool randomize;
+
+			inline level(void) : hint_seen(false), randomize(true) {}
 		};
 		extern std::vector<rect> textures[32];
 		extern std::vector<box> hitboxes[32];

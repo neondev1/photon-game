@@ -10,6 +10,19 @@
 #include <iostream>
 #include <thread>
 
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif // NOMINMAX
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif // WIN32_LEAN_AND_MEAN
+#ifndef VC_EXTRALEAN
+#define VC_EXTRALEAN
+#endif // VC_EXTRALEAN
+#include <windows.h>
+#endif // _WIN32
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
@@ -62,8 +75,17 @@ static bool command = false;
 
 int main(void) {
 	srand((unsigned)time(NULL));
-	if (!glfwInit())
+#ifdef _WIN32
+	DisableProcessWindowsGhosting();
+#endif // _WIN32
+	if (!glfwInit()) {
+#ifdef _WIN32
+		MessageBoxA(NULL, "Failed to initialize GLFW", "", MB_OK | MB_ICONERROR);
+#else
+		std::cout << "Failed to initialize GLFW" << std::endl;
+#endif // _WIN32
 		exit(EXIT_FAILURE);
+	}
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -71,12 +93,22 @@ int main(void) {
 	GLFWwindow* window = glfwCreateWindow(1280, 720, "Photon", NULL, NULL);
 	if (window == NULL) {
 		glfwTerminate();
+#ifdef _WIN32
+		MessageBoxA(NULL, "Failed to create window", "", MB_OK | MB_ICONERROR);
+#else
+		std::cout << "Failed to create window" << std::endl;
+#endif // _WIN32
 		exit(EXIT_FAILURE);
 	}
 	glfwMakeContextCurrent(window);
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
 		glfwDestroyWindow(window);
 		glfwTerminate();
+#ifdef _WIN32
+		MessageBoxA(NULL, "Failed to load glad", "", MB_OK | MB_ICONERROR);
+#else
+		std::cout << "Failed to load glad" << std::endl;
+#endif // _WIN32
 		exit(EXIT_FAILURE);
 	}
 	glViewport(0, 0, 1280, 720);
@@ -99,27 +131,35 @@ int main(void) {
 	std::cout << "Type `help` for a list of commands." << std::endl;
 	glClear(GL_COLOR_BUFFER_BIT);
 	glfwSwapBuffers(window);
+	bool unsaved = false;
 	while (!glfwWindowShouldClose(window)) {
 		command = false;
 		bool preview = false;
 		while (1) {
+			glfwPollEvents();
 			std::string cmd;
 			std::cout << "> ";
 			std::cin >> cmd;
+			cmd = cmd.substr(cmd.find_first_not_of(" \f\n\r\t\v"));
 			std::transform(cmd.begin(), cmd.end(), cmd.begin(),
 				[](char c) { return std::tolower(c); });
 			std::vector<object>* current = &res::loader::levels.data()[gamestate::level].objects;
+			if (cmd.empty())
+				continue;
 			if (cmd == "help") {
 				std::cout << "All parameters in [square brackets] are integers. All parameters in (parentheses) are strings.\n";
 				std::cout << "List of commands:\n";
 				std::cout << "help          - Displays this list.\n";
 				std::cout << "cheatsheet    - Displays the numerical values of directions, orientations, and object types.\n";
 				std::cout << "load (path)   - Loads a level from a file for editing.\n";
+				std::cout << "import (path) - Loads a level from a file for editing.\n";
 				std::cout << "export (path) - Exports the level to a file. You can export the default level to see what the file is like.\n";
 				std::cout << "save          - Like `export`, but does not warn before overwriting. Must have used `load`/`export` first.\n";
 				std::cout << "levels        - Lists all levels as well as their object counts.\n";
 				std::cout << "level [n]     - Selects the [n]th level. If this level does not exist, it will be created.\n";
 				std::cout << "remove [n]    - Removes the [n]th level.\n";
+				std::cout << "random [bool] - If set to 1, the orientation of rotatable objects is randomized at the beginning of every attempt.\n";
+				std::cout << "                If set to 0, the orientation is not randomized. The default value is 1.\n";
 				std::cout << "text (str)    - Sets the text to be displayed before loading the selected level to (str).\n";
 				std::cout << "rmtext        - Removes the text displayed before the selected level.\n";
 				std::cout << "list          - Lists all objects in the selected level.\n";
@@ -135,8 +175,8 @@ int main(void) {
 				std::cout << "preview       - Renders the selected level.\n";
 				std::cout << "play          - Plays the selected level.\n";
 				std::cout << "credits       - Displays credits.\n";
-				std::cout << "quit          - Exits the game.\n";
-				std::cout << "exit          - Exits the game." << std::endl;
+				std::cout << "quit          - Exits the editor.\n";
+				std::cout << "exit          - Exits the editor." << std::endl;
 			}
 			else if (cmd == "cheatsheet") {
 				std::cout << "Directions     | Orientationss | Types\n";
@@ -167,7 +207,48 @@ int main(void) {
 				std::cout << "S_ATAN3   = 23 |               |\n";
 				std::cout << "NONE      = 24 |               |" << std::endl;
 			}
-			else if (cmd == "load") {
+			else if (cmd == "load" || cmd == "import") {
+				if (unsaved) {
+					char c;
+					do {
+						std::cout << "Save current level? (Y/N) ";
+						std::string s;
+						std::cin >> s;
+						c = std::toupper(s.front());
+					} while (c != 'Y' && c != 'N');
+					if (c == 'Y') {
+						if (gamestate::save.empty()) {
+							std::getline(std::cin, gamestate::save);
+							std::cout << "Enter a filename: ";
+							std::getline(std::cin, gamestate::save);
+						}
+						std::ofstream out(gamestate::save, std::ios::trunc);
+						for (int i = 0; i < res::loader::levels.size(); i++) {
+							out << ' ' << res::loader::levels.data()[i].hint << '\n';
+							const object& p = res::loader::levels.data()[i].objects.data()[0];
+							out << res::loader::levels.data()[i].randomize << ' '
+								<< p.x << ' ' << p.y << ' ' << p.data << '\n';
+							for (int j = 2; j < res::loader::levels.data()[i].objects.size(); j++) {
+								const object& obj = res::loader::levels.data()[i].objects.data()[j];
+								out << (int)obj.type << ' ' << obj.x << ' ' << obj.y << ' ' << (int)obj.orientation;
+								if (obj.type == object::enum_type::MOVING_WALL
+									|| obj.type == object::enum_type::MOVING_BLOCK
+									|| obj.type == object::enum_type::MOVING_CRYSTAL) {
+									out << ' ' << obj.x2 << ' ' << obj.y2 << ' ' << obj.data;
+								}
+								out << '\n';
+							}
+						}
+						std::flush(out);
+						if (out.fail()) {
+							std::cout << "Something went wrong while writing to the file." << std::endl;
+							out.close();
+							continue;
+						}
+						out.close();
+						unsaved = false;
+					}
+				}
 				std::string path;
 				std::getline(std::cin, path);
 				path = path.substr(1);
@@ -199,23 +280,26 @@ int main(void) {
 				gamestate::save = path;
 				std::ofstream out(path, std::ios::trunc);
 				for (int i = 0; i < res::loader::levels.size(); i++) {
-					out << " " << res::loader::levels.data()[i].hint << "\n";
+					out << ' ' << res::loader::levels.data()[i].hint << '\n';
 					const object& p = res::loader::levels.data()[i].objects.data()[0];
-					out << p.x << " " << p.y << " " << p.data << "\n";
+					out << res::loader::levels.data()[i].randomize << ' '
+						<< p.x << ' ' << p.y << ' ' << p.data << '\n';
 					for (int j = 2; j < res::loader::levels.data()[i].objects.size(); j++) {
 						const object& obj = res::loader::levels.data()[i].objects.data()[j];
-						out << (int)obj.type << " " << obj.x << " " << obj.y << " " << (int)obj.orientation;
+						out << (int)obj.type << ' ' << obj.x << ' ' << obj.y << ' ' << (int)obj.orientation;
 						if (obj.type == object::enum_type::MOVING_WALL
 							|| obj.type == object::enum_type::MOVING_BLOCK
 							|| obj.type == object::enum_type::MOVING_CRYSTAL) {
-							out << " " << obj.x2 << " " << obj.y2 << " " << obj.data;
+							out << ' ' << obj.x2 << ' ' << obj.y2 << ' ' << obj.data;
 						}
-						out << "\n";
+						out << '\n';
 					}
 				}
 				std::flush(out);
 				if (out.fail())
-					std::cout << "Something went wrong while writing to the file" << std::endl;
+					std::cout << "Something went wrong while writing to the file." << std::endl;
+				else
+					unsaved = false;
 				out.close();
 			}
 			else if (cmd == "save") {
@@ -225,30 +309,35 @@ int main(void) {
 				}
 				std::ofstream out(gamestate::save, std::ios::trunc);
 				for (int i = 0; i < res::loader::levels.size(); i++) {
-					out << " " << res::loader::levels.data()[i].hint << "\n";
+					out << ' ' << res::loader::levels.data()[i].hint << '\n';
 					const object& p = res::loader::levels.data()[i].objects.data()[0];
-					out << p.x << " " << p.y << " " << p.data << "\n";
+					out << res::loader::levels.data()[i].randomize << ' '
+						<< p.x << ' ' << p.y << ' ' << p.data << '\n';
 					for (int j = 2; j < res::loader::levels.data()[i].objects.size(); j++) {
 						const object& obj = res::loader::levels.data()[i].objects.data()[j];
-						out << (int)obj.type << " " << obj.x << " " << obj.y << " " << (int)obj.orientation;
+						out << (int)obj.type << ' ' << obj.x << ' ' << obj.y << ' ' << (int)obj.orientation;
 						if (obj.type == object::enum_type::MOVING_WALL
 							|| obj.type == object::enum_type::MOVING_BLOCK
 							|| obj.type == object::enum_type::MOVING_CRYSTAL) {
-							out << " " << obj.x2 << " " << obj.y2 << " " << obj.data;
+							out << ' ' << obj.x2 << ' ' << obj.y2 << ' ' << obj.data;
 						}
-						out << "\n";
+						out << '\n';
 					}
 				}
 				std::flush(out);
 				if (out.fail())
-					std::cout << "Something went wrong while writing to the file" << std::endl;
+					std::cout << "Something went wrong while writing to the file." << std::endl;
+				else
+					unsaved = false;
 				out.close();
 			}
 			else if (cmd == "levels")
 				for (int i = 0; i < res::loader::levels.size(); i++)
 					std::cout << "Level " << i + 1 << " - "
-						<< res::loader::levels.data()[i].objects.size() - 2 << " objects\n\""
-						<< res::loader::levels.data()[i].hint << "\"" << std::endl;
+						<< res::loader::levels.data()[i].objects.size() - 2
+						<< " object" << (res::loader::levels.data()[i].objects.size() == 3 ? "" : "s") << "; "
+						<< "orientation of objects" << (res::loader::levels.data()[i].randomize ? " " : " not ")
+						<< "randomized\n\"" << res::loader::levels.data()[i].hint << "\"" << std::endl;
 			else if (cmd == "level") {
 				std::string _n;
 				std::cin >> _n;
@@ -271,6 +360,7 @@ int main(void) {
 						(int)photon::enum_direction::E));
 					res::loader::levels.back().objects.push_back(object(0.0, 0.0, 640, 360,
 						object::enum_orientation::NONE, object::enum_type::NONE, NULL, NULL, 0));
+					unsaved = true;
 				}
 				if ((size_t)(n - 1) <= res::loader::levels.size())
 					gamestate::level = n - 1;
@@ -307,14 +397,31 @@ int main(void) {
 				} while (c != 'Y' && c != 'N');
 				if (c == 'Y')
 					res::loader::levels.erase(res::loader::levels.begin() + (n - 1));
+				unsaved = true;
+			}
+			else if (cmd == "random") {
+				std::string _r;
+				std::cin >> _r;
+				bool r;
+				try {
+					r = std::stoi(_r) != 0;
+				}
+				catch (...) {
+					std::cout << "Invalid input" << std::endl;
+					continue;
+				}
+				res::loader::levels.data()[gamestate::level].randomize = r;
 			}
 			else if (cmd == "text") {
 				std::string text;
 				std::getline(std::cin, text);
 				res::loader::levels.data()[gamestate::level].hint = text.substr(1);
+				unsaved = true;
 			}
-			else if (cmd == "rmtext")
+			else if (cmd == "rmtext") {
 				res::loader::levels.data()[gamestate::level].hint.clear();
+				unsaved = true;
+			}
 			else if (cmd == "list") {
 				for (int i = 2; i < current->size(); i++) {
 					std::cout << "id=" << i - 2 << " | type=" << (int)current->data()[i].type
@@ -383,6 +490,7 @@ int main(void) {
 					current->back().y2 = y2;
 					current->back().data = link;
 				}
+				unsaved = true;
 			}
 			else if (cmd == "move") {
 				std::string _id, _x, _y, _o;
@@ -409,6 +517,7 @@ int main(void) {
 				current->data()[id].y = y;
 				current->data()[id]._y = y;
 				current->data()[id].orientation = (object::enum_orientation)o;
+				unsaved = true;
 			}
 			else if (cmd == "inspect") {
 				std::string _id;
@@ -448,6 +557,7 @@ int main(void) {
 					continue;
 				}
 				current->erase(current->begin() + (id + 2));
+				unsaved = true;
 			}
 			else if (cmd == "clear") {
 				char c;
@@ -465,6 +575,7 @@ int main(void) {
 					current->push_back(object(0.0, 0.0, 640, 360,
 						object::enum_orientation::NONE, object::enum_type::NONE, NULL, NULL, 0));
 				}
+				unsaved = true;
 			}
 			else if (cmd == "spawn") {
 				std::string _x, _y, _dir;
@@ -486,6 +597,7 @@ int main(void) {
 				current->data()[0].x = x;
 				current->data()[0].y = y;
 				current->data()[0].data = dir;
+				unsaved = true;
 			}
 			else if (cmd == "preview") {
 				res::loader::load_level(gamestate::level, false);
@@ -505,6 +617,46 @@ int main(void) {
 				std::cout << "Glad: Copyright (c) 2013-2022 David Herberth; licensed under the MIT License" << std::endl;
 			}
 			else if (cmd == "quit" || cmd == "exit") {
+				if (unsaved) {
+					char c;
+					do {
+						std::cout << "Save? (Y/N) ";
+						std::string s;
+						std::cin >> s;
+						c = std::toupper(s.front());
+					} while (c != 'Y' && c != 'N');
+					if (c == 'Y') {
+						if (gamestate::save.empty()) {
+							std::getline(std::cin, gamestate::save);
+							std::cout << "Enter a filename: ";
+							std::getline(std::cin, gamestate::save);
+						}
+						std::ofstream out(gamestate::save, std::ios::trunc);
+						for (int i = 0; i < res::loader::levels.size(); i++) {
+							out << ' ' << res::loader::levels.data()[i].hint << '\n';
+							const object& p = res::loader::levels.data()[i].objects.data()[0];
+							out << res::loader::levels.data()[i].randomize << ' '
+								<< p.x << ' ' << p.y << ' ' << p.data << '\n';
+							for (int j = 2; j < res::loader::levels.data()[i].objects.size(); j++) {
+								const object& obj = res::loader::levels.data()[i].objects.data()[j];
+								out << (int)obj.type << ' ' << obj.x << ' ' << obj.y << ' ' << (int)obj.orientation;
+								if (obj.type == object::enum_type::MOVING_WALL
+									|| obj.type == object::enum_type::MOVING_BLOCK
+									|| obj.type == object::enum_type::MOVING_CRYSTAL) {
+									out << ' ' << obj.x2 << ' ' << obj.y2 << ' ' << obj.data;
+								}
+								out << '\n';
+							}
+						}
+						std::flush(out);
+						if (out.fail()) {
+							std::cout << "Something went wrong while writing to the file." << std::endl;
+							out.close();
+							continue;
+						}
+						out.close();
+					}
+				}
 				glfwDestroyWindow(window);
 				glfwTerminate();
 				exit(EXIT_SUCCESS);
@@ -513,6 +665,7 @@ int main(void) {
 				std::cout << "Unrecognized command" << std::endl;
 		}
 		while (!glfwWindowShouldClose(window)) {
+			glfwPollEvents();
 			if (preview) {
 				for (int i = 0; i < 2; i++) {
 					glClear(GL_COLOR_BUFFER_BIT);
@@ -600,7 +753,6 @@ int main(void) {
 				while (glfwGetTime() - now < next - cur)
 					std::this_thread::sleep_for(zero);
 			}
-			glfwPollEvents();
 		}
 	}
 	glfwDestroyWindow(window);
@@ -676,4 +828,5 @@ namespace keybinds {
 	int cw = GLFW_KEY_RIGHT_BRACKET;
 	int perp = GLFW_KEY_BACKSLASH;
 	int toggle = GLFW_KEY_SLASH;
+	int hint = GLFW_KEY_H;
 }

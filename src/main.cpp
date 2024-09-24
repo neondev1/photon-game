@@ -6,7 +6,20 @@
 
 #ifdef _DEBUG
 #include <iostream>
-#endif
+#endif // _DEBUG
+
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif // NOMINMAX
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif // WIN32_LEAN_AND_MEAN
+#ifndef VC_EXTRALEAN
+#define VC_EXTRALEAN
+#endif // VC_EXTRALEAN
+#include <windows.h>
+#endif // _WIN32
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -34,8 +47,12 @@ static bool list_nodes(node* root, int depth);
 
 int main(void) {
 	srand((unsigned)time(NULL));
-	if (!glfwInit())
+	if (!glfwInit()) {
+#ifdef _WIN32
+		MessageBoxA(NULL, "Failed to initialize GLFW", "", MB_OK | MB_ICONERROR);
+#endif // _WIN32
 		exit(EXIT_FAILURE);
+	}
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -43,12 +60,18 @@ int main(void) {
 	gui::window = glfwCreateWindow(1280, 720, "Photon", NULL, NULL);
 	if (gui::window == NULL) {
 		glfwTerminate();
+#ifdef _WIN32
+		MessageBoxA(NULL, "Failed to create window", "", MB_OK | MB_ICONERROR);
+#endif // _WIN32
 		exit(EXIT_FAILURE);
 	}
 	glfwMakeContextCurrent(gui::window);
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
 		glfwDestroyWindow(gui::window);
 		glfwTerminate();
+#ifdef _WIN32
+		MessageBoxA(NULL, "Failed to load glad", "", MB_OK | MB_ICONERROR);
+#endif // _WIN32
 		exit(EXIT_FAILURE);
 	}
 	glViewport(0, 0, 1280, 720);
@@ -150,9 +173,7 @@ int main(void) {
 		list_nodes(NULL, 0);
 	}
 	*/
-#endif
-	// This program is probably about as stable as the economy
-	// of the Weimar Republic during the hyperinflation of 1923
+#endif // _DEBUG
 	while (!glfwWindowShouldClose(gui::window)) {
 		if (gui::quit)
 			break;
@@ -280,7 +301,7 @@ int main(void) {
 				else if (gamestate::hint && !res::loader::levels.data()[gamestate::level].hint.empty()) {
 					glClear(GL_COLOR_BUFFER_BIT);
 					render_text(res::loader::levels.data()[gamestate::level].hint, 50, 50, 1180, 3, false, 0, vec(1.0f, 1.0f, 1.0f, 1.0f));
-					render_text("Press any key to dismiss", 50, 637, 1180, 3, false, 0, vec(1.0f, 1.0f, 1.0f, 1.0f));
+					render_text("Press any key to dismiss", 50, 648, 1180, 2, false, 0, vec(1.0f, 1.0f, 1.0f, 1.0f));
 				}
 				else if ((gui::frame % 10 - gui::frame % 2) && !object::invalidate_all) {
 					for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end(); ++it) {
@@ -586,4 +607,4 @@ static bool list_nodes(node* root, int depth) {
 		list_nodes(children.data()[i], depth + 1);
 	return false;
 }
-#endif
+#endif _DEBUG

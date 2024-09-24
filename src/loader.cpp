@@ -124,15 +124,17 @@ bool res::loader::load_from_file(std::string path) {
 	std::ifstream in(path);
 	std::string str;
 	while (std::getline(in, str)) {
+		bool randomize;
 		int x, y, dir;
 		if (str.data()[0] == ' ') {
 			levels.push_back(level());
 			levels.back().hint = str.substr(1);
-			in >> x >> y >> dir;
+			in >> randomize >> x >> y >> dir;
 			if (in.fail() || dir < 0 || dir >= (int)photon::enum_direction::NONE) {
 				in.close();
 				return false;
 			}
+			levels.back().randomize = randomize;
 			levels.back().objects.push_back(object(x, y, 1, 1,
 				object::enum_orientation::NONE, object::enum_type::NONE, TEX_PHOTON, NULL, dir));
 			levels.back().objects.push_back(object(0.0, 0.0, 640, 360,
@@ -206,6 +208,13 @@ void res::loader::load_level(int level, bool randomize_orientation) {
 		}
 		else if (obj.type == object::enum_type::SENSOR)
 			gamestate::sensors++;
+		if ((randomize_orientation && res::loader::levels.data()[level].randomize)
+			|| obj.orientation == object::enum_orientation::NONE) {
+			if (obj.type == object::enum_type::MIRROR)
+				obj.orientation = (object::enum_orientation)(rand() / ((RAND_MAX + 1) / 16));
+			else if (obj.type == object::enum_type::GLASS_BLOCK)
+				obj.orientation = (object::enum_orientation)(rand() / ((RAND_MAX + 1) / 8) * 2);
+		}
 	}
 	gamestate::activated = 0;
 	object::selected = res::objects.size() > 1 ? &res::objects.data()[1] : NULL;
