@@ -811,16 +811,28 @@ int main(void) {
 						}
 						for (int i = 1; i < res::objects.size(); i++) {
 							object& obj = res::objects.data()[i];
-							if (std::any_of(photon::photons.begin(), photon::photons.end(), [obj, tps](photon p) {
+							const static object::enum_type translucent[] = {
+								object::enum_type::DIAGONAL_MIRROR,
+								object::enum_type::GLASS_BLOCK, object::enum_type::FIXED_BLOCK,
+								object::enum_type::MOVING_BLOCK, object::enum_type::PRISM,
+								object::enum_type::SPDC_CRYSTAL, object::enum_type::MOVING_CRYSTAL,
+								object::enum_type::SPLITTER
+							};
+							const static object::enum_type* end = translucent + sizeof(translucent) / sizeof(object::enum_type);
+							if (std::find(translucent, end, obj.type) != end || (obj.toggle && (obj.type == object::enum_type::DOOR || obj.type == object::enum_type::MIRROR_DOOR)))
+								object::invalidated.insert(&obj);
+							else if ((obj.type == object::enum_type::DOOR || obj.type == object::enum_type::MIRROR_DOOR) && obj.toggle)
+								object::invalidated.insert(&obj);
+							else if (std::any_of(photon::photons.begin(), photon::photons.end(), [obj, tps](photon p) {
 								return obj.type != object::enum_type::NONE
 									&& obj_dist(p._x, p._y, obj) <= 960.0 / tps;
 							}))
-								object::invalidated.push_back(&obj);
-							if (object::previous && object::previous->linked
+								object::invalidated.insert(&obj);
+							else if (object::previous && object::previous->linked
 								&& std::any_of(object::previous->linked->members.begin(), object::previous->linked->members.end(),
 									[obj](object* o) { return o == &obj; }))
-								object::invalidated.push_back(&obj);
-							if (object::selected && object::selected->linked
+								object::invalidated.insert(&obj);
+							else if (object::selected && object::selected->linked
 								&& std::any_of(object::selected->linked->members.begin(), object::selected->linked->members.end(),
 									[obj](object* o) {
 								object temp = *o;
@@ -830,7 +842,7 @@ int main(void) {
 								temp.height += 8;
 								return object::overlapping(temp, obj);
 							}))
-								object::invalidated.push_back(&obj);
+								object::invalidated.insert(&obj);
 							else if (object::selected && !object::selected->linked) {
 								object temp = *object::selected;
 								temp.x -= 4;
@@ -838,11 +850,11 @@ int main(void) {
 								temp.width += 8;
 								temp.height += 8;
 								if (object::overlapping(temp, obj))
-									object::invalidated.push_back(&obj);
+									object::invalidated.insert(&obj);
 							}
 						}
 						if (object::previous && !object::previous->linked)
-							object::invalidated.push_back(object::previous);
+							object::invalidated.insert(object::previous);
 						for (size_t count = -1; count != object::invalidated.size(); count = object::invalidated.size()) {
 							for (int i = 1; i < res::objects.size(); i++) {
 								object& obj = res::objects.data()[i];
@@ -850,12 +862,13 @@ int main(void) {
 									return obj.type != object::enum_type::NONE
 										&& object::overlapping(obj, *other);
 								}))
-									object::invalidated.push_back(&obj);
+									object::invalidated.insert(&obj);
 							}
 						}
 						for (int layer = -1; layer < 7; layer++)
-							for (int i = 0; i < object::invalidated.size(); i++)
-								object::invalidated.data()[i]->render(layer);
+							for (std::unordered_set<object*>::iterator it = object::invalidated.begin();
+								it != object::invalidated.end(); ++it)
+								(*it)->render(layer);
 						if (game::frame % 2)
 							object::invalidated.clear();
 						if (object::selected) {

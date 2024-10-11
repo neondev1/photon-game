@@ -115,6 +115,14 @@ void res::loader::load_default(void) {
 		(int)photon::enum_direction::E));
 	levels.back().objects.push_back(object(0.0, 0.0, 640, 360,
 		object::enum_orientation::NONE, object::enum_type::NONE, NULL, NULL, 0));
+	levels.back().objects.push_back(object(200.0, 10.0, 30, 60,
+		object::enum_orientation::NONE, object::enum_type::DOOR, TEX_DOOR, NULL, 1));
+	levels.back().objects.push_back(object(230.0, 10.0, 50, 20,
+		object::enum_orientation::NONE, object::enum_type::DOOR, TEX_DOOR, NULL, 1));
+	levels.back().objects.push_back(object(300.0, 100.0, 20, 20,
+		object::enum_orientation::NONE, object::enum_type::DOOR, TEX_DOOR, NULL, 0));
+	levels.back().objects.push_back(object(500.0, 100.0, 20, 20,
+		object::enum_orientation::NONE, object::enum_type::SPDC_CRYSTAL, TEX_SPDC, NULL, 0));
 }
 
 bool res::loader::load_from_file(std::string path) {

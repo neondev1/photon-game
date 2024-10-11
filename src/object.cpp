@@ -34,7 +34,7 @@ object::object(double x, double y, int width, int height, enum_orientation orien
 
 object* object::selected = NULL;
 object* object::previous = NULL;
-std::vector<object*> object::invalidated;
+std::unordered_set<object*> object::invalidated;
 bool object::invalidate_all;
 std::list<group> object::groups;
 std::unordered_map<unsigned, std::vector<rect>> object::temp_tex;

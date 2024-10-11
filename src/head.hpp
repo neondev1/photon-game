@@ -56,9 +56,9 @@ class object {
 public:
 	static object* selected;
 	static object* previous;
-	static std::vector<object*> invalidated;
-	static bool invalidate_all;
 	static std::list<group> groups;
+	static bool invalidate_all;
+	static std::unordered_set<object*> invalidated;
 	static std::unordered_map<unsigned, std::vector<rect>> temp_tex;
 
 	enum class enum_orientation {
