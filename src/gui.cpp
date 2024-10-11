@@ -22,7 +22,6 @@ namespace fs = std::filesystem;
 GLFWwindow* gui::window;
 
 namespace gui {
-	size_t frame = 0;
 	bool menu = true;
 	bool quit = false;
 	std::vector<element*> elements;
@@ -36,21 +35,21 @@ void gui::load_gui(void) {
 	gui::elements.push_back(new gui::label(100, 100, 1000, true, "PHOTON", fore, 6));
 	gui::elements.push_back(new gui::button(100, 240, 90, 42, true, 10, "PLAY",
 		fore, back, []() {
-		if (gamestate::hardcore && gamestate::failures)
+		if (game::hardcore && game::failures)
 			return;
-		if (gamestate::level >= res::loader::levels.size())
+		if (game::level >= res::loader::levels.size())
 			return;
-		if (gamestate::started) {
+		if (game::started) {
 			glClear(GL_COLOR_BUFFER_BIT);
 			int index = 0;
 			for (; index < gui::elements.size() - 2 && gui::elements.data()[index]->text != "No valid savefile loaded"; index++);
 			gui::elements.data()[index]->visible = false;
 			gui::elements.data()[index + 1]->visible = false;
-			gui::frame = -1;
+			game::frame = -1;
 			gui::menu = false;
 		}
-		else if (!gamestate::save.empty()) {
-			std::ofstream out(gamestate::save, std::ios::app);
+		else if (!game::save.empty()) {
+			std::ofstream out(game::save, std::ios::app);
 			out << std::endl;
 			if (out.fail()) {
 				int index = 0;
@@ -61,10 +60,10 @@ void gui::load_gui(void) {
 			else {
 				glClear(GL_COLOR_BUFFER_BIT);
 				gui::elements.data()[1]->text = "PAUSED";
-				gamestate::started = true;
-				gui::frame = -1;
+				game::started = true;
+				game::frame = -1;
 				gui::menu = false;
-				res::loader::load_level(gamestate::level, true);
+				res::loader::load_level(game::level, true);
 			}
 			out.close();
 		}
@@ -95,7 +94,7 @@ void gui::load_gui(void) {
 		}
 	}));
 	gui::elements.push_back(new gui::label(105, 360, 1000, true, "Path to savefile:", fore, 2));
-	gui::elements.push_back(new gui::textbox(100, 390, 1080, 140, true, 10, gamestate::save, fore, back));
+	gui::elements.push_back(new gui::textbox(100, 390, 1080, 140, true, 10, game::save, fore, back));
 	gui::elements.push_back(new gui::button(100, 540, 180, 42, true, 10, "LOAD SAVE",
 		fore, back, []() {
 		int index = 0;
@@ -105,8 +104,8 @@ void gui::load_gui(void) {
 			std::ifstream in(save);
 			char hc;
 			in >> hc;
-			gamestate::hardcore = hc == 'h';
-			in >> gamestate::level >> gamestate::failures >> gamestate::time;
+			game::hardcore = hc == 'h';
+			in >> game::level >> game::failures >> game::time;
 			if (in.fail()) {
 				int index = 0;
 				for (; index < gui::elements.size() - 1 && gui::elements.data()[index]->text != "Invalid savefile"; index++);
@@ -118,11 +117,11 @@ void gui::load_gui(void) {
 				for (; index < gui::elements.size() - 2 && gui::elements.data()[index]->text != "File not found"; index++);
 				gui::elements.data()[index]->visible = false;
 				gui::elements.data()[index + 1]->visible = false;
-				gamestate::save = fs::absolute(fs::path(save)).string();
+				game::save = fs::absolute(fs::path(save)).string();
 				std::ofstream cfg("./settings", std::ios::trunc);
 				cfg << keybinds::up << '\n' << keybinds::left << '\n' << keybinds::down << '\n' << keybinds::right << '\n';
 				cfg << keybinds::ccw << '\n' << keybinds::cw << '\n' << keybinds::perp << '\n' << keybinds::toggle << '\n';
-				cfg << keybinds::hint << '\n' << gamestate::save << std::endl;
+				cfg << keybinds::hint << '\n' << game::save << std::endl;
 				cfg.close();
 			}
 			in.close();
@@ -145,18 +144,18 @@ void gui::load_gui(void) {
 		std::ofstream out(fs::path("./saves") / (std::to_string(i) + ".save"));
 		out << "n\n0\n0\n0" << std::endl;
 		out.close();
-		gamestate::hardcore = false;
-		gamestate::level = 0;
-		gamestate::failures = 0;
-		gamestate::time = 0;
-		gamestate::save = fs::absolute(fs::path("./saves") / (std::to_string(i) + ".save")).string();
+		game::hardcore = false;
+		game::level = 0;
+		game::failures = 0;
+		game::time = 0;
+		game::save = fs::absolute(fs::path("./saves") / (std::to_string(i) + ".save")).string();
 		int index = 0;
 		for (; index < gui::elements.size() - 2 && gui::elements.data()[index]->text != "Path to savefile:"; index++);
-		gui::elements.data()[index + 1]->text = gamestate::save;
+		gui::elements.data()[index + 1]->text = game::save;
 		std::ofstream cfg("./settings", std::ios::trunc);
 		cfg << keybinds::up << '\n' << keybinds::left << '\n' << keybinds::down << '\n' << keybinds::right << '\n';
 		cfg << keybinds::ccw << '\n' << keybinds::cw << '\n' << keybinds::perp << '\n' << keybinds::toggle << '\n';
-		cfg << keybinds::hint << '\n' << gamestate::save << std::endl;
+		cfg << keybinds::hint << '\n' << game::save << std::endl;
 		cfg.close();
 	}));
 	gui::elements.push_back(new gui::button(855, 540, 325, 42, true, 10, "NEW HARDCORE SAVE",
@@ -170,18 +169,18 @@ void gui::load_gui(void) {
 		std::ofstream out(fs::path("./saves") / (std::to_string(i) + ".save"));
 		out << "h\n0\n0\n0" << std::endl;
 		out.close();
-		gamestate::hardcore = true;
-		gamestate::level = 0;
-		gamestate::failures = 0;
-		gamestate::time = 0;
-		gamestate::save = fs::absolute(fs::path("./saves") / (std::to_string(i) + ".save")).string();
+		game::hardcore = true;
+		game::level = 0;
+		game::failures = 0;
+		game::time = 0;
+		game::save = fs::absolute(fs::path("./saves") / (std::to_string(i) + ".save")).string();
 		int index = 0;
 		for (; index < gui::elements.size() - 2 && gui::elements.data()[index]->text != "Path to savefile:"; index++);
-		gui::elements.data()[index + 1]->text = gamestate::save;
+		gui::elements.data()[index + 1]->text = game::save;
 		std::ofstream cfg("./settings", std::ios::trunc);
 		cfg << keybinds::up << '\n' << keybinds::left << '\n' << keybinds::down << '\n' << keybinds::right << '\n';
 		cfg << keybinds::ccw << '\n' << keybinds::cw << '\n' << keybinds::perp << '\n' << keybinds::toggle << '\n';
-		cfg << keybinds::hint << '\n' << gamestate::save << std::endl;
+		cfg << keybinds::hint << '\n' << game::save << std::endl;
 		cfg.close();
 	}));
 	gui::elements.push_back(new gui::button(100, 600, 90, 42, true, 10, "QUIT",
@@ -246,7 +245,7 @@ void gui::load_gui(void) {
 		std::ofstream cfg("./settings", std::ios::trunc);
 		cfg << keybinds::up << '\n' << keybinds::left << '\n' << keybinds::down << '\n' << keybinds::right << '\n';
 		cfg << keybinds::ccw << '\n' << keybinds::cw << '\n' << keybinds::perp << '\n' << keybinds::toggle << '\n';
-		cfg << keybinds::hint << '\n' << gamestate::save << std::endl;
+		cfg << keybinds::hint << '\n' << game::save << std::endl;
 		cfg.close();
 	}));
 	// Messages
@@ -255,7 +254,7 @@ void gui::load_gui(void) {
 	gui::elements.push_back(new gui::label(200, 255, 1000, false, "Unable to write to savefile", fore, 1));
 	gui::elements.push_back(new gui::label(290, 555, 1000, false, "File not found", fore, 1));
 	gui::elements.push_back(new gui::label(290, 555, 1000, false, "Invalid savefile", fore, 1));
-	gui::elements.push_back(new gui::label(100, 660, 1000, false, "This game uses the following libraries:\nGLFW: Copyright (c) 2002-2006 Marcus Geelnard, (c) 2006-2019 Camilla L" + STR(FONT_O_UMLAUT) + "wy; licensed under the zlib License\nGlad: Copyright (c) 2013-2022 David Herberth; licensed under the MIT License", fore, 1));
+	gui::elements.push_back(new gui::label(100, 660, 1000, false, "This game uses the following libraries:\nGLFW: Copyright (c) 2002-2006 Marcus Geelnard, (c) 2006-2019 Camilla L" + STR(FONT_O_UMLAUT) + "wy; licensed under the zlib License\nglad: Copyright (c) 2013-2022 David Herberth; licensed under the MIT License", fore, 1));
 	gui::elements.push_back(new gui::label(700, 100, 1000, false, "Fails: ", fore, 2));
 	gui::elements.push_back(new gui::label(700, 100, 1000, false, "Level: ", fore, 2));
 	gui::elements.push_back(new gui::label(718, 144, 1000, false, "Time: ", fore, 2));
@@ -529,7 +528,7 @@ void gui::keybind_button::handler(enum_event type, int a, int b, int c) {
 				std::ofstream cfg("./settings", std::ios::trunc);
 				cfg << keybinds::up << '\n' << keybinds::left << '\n' << keybinds::down << '\n' << keybinds::right << '\n';
 				cfg << keybinds::ccw << '\n' << keybinds::cw << '\n' << keybinds::perp << '\n' << keybinds::toggle << '\n';
-				cfg << keybinds::hint << '\n' << gamestate::save << std::endl;
+				cfg << keybinds::hint << '\n' << game::save << std::endl;
 				cfg.close();
 			}
 			double _x = 0, _y = 0;

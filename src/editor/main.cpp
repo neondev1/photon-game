@@ -1,9 +1,5 @@
-// If you want to use the editor, exclude the original
-// main.cpp file from compilation (select it and go
-// into Properties) and compile with this one instead
-
-// (This file is excluded from compilation by default)
-// (Don't try compiling with both versions of main, it won't work)
+// If you want to use the editor, compile the
+// project using the EditorRelease configuration
 
 #include <filesystem>
 #include <fstream>
@@ -72,6 +68,7 @@ namespace fs = std::filesystem;
 void key_cb(GLFWwindow* window, int key, int scancode, int action, int mods);
 
 static bool command = false;
+long long game::frame = -1;
 
 int main(void) {
 	srand((unsigned)time(NULL));
@@ -143,9 +140,14 @@ int main(void) {
 			cmd = cmd.substr(cmd.find_first_not_of(" \f\n\r\t\v"));
 			std::transform(cmd.begin(), cmd.end(), cmd.begin(),
 				[](char c) { return std::tolower(c); });
-			std::vector<object>* current = &res::loader::levels.data()[gamestate::level].objects;
+			std::vector<object>* current = &res::loader::levels.data()[game::level].objects;
 			if (cmd.empty())
 				continue;
+			const static object::enum_type toggleable[] = {
+				object::enum_type::DOOR, object::enum_type::MIRROR_DOOR,
+				object::enum_type::MOVING_WALL, object::enum_type::MOVING_BLOCK, object::enum_type::MOVING_CRYSTAL
+			};
+			const static object::enum_type* end = toggleable + sizeof(toggleable) / sizeof(object::enum_type);
 			if (cmd == "help") {
 				std::cout << "All parameters in [square brackets] are integers. All parameters in (parentheses) are strings.\n";
 				std::cout << "List of commands:\n";
@@ -171,7 +173,7 @@ int main(void) {
 				std::cout << "delete [id]   - Removes the object specified by [id]. Use `list` for a list of IDs.\n";
 				std::cout << "clear         - Removes all objects in the selected level.\n";
 				std::cout << "spawn [x] [y] [dir]\n";
-				std::cout << "              - Sets the spawn position of the photon to([x], [y]) with initial direction[dir]. See `cheatsheet`.\n";
+				std::cout << "              - Sets the spawn position of the photon to([x], [y]) with initial direction [dir]. See `cheatsheet`.\n";
 				std::cout << "preview       - Renders the selected level.\n";
 				std::cout << "play          - Plays the selected level.\n";
 				std::cout << "credits       - Displays credits.\n";
@@ -217,12 +219,12 @@ int main(void) {
 						c = std::toupper(s.front());
 					} while (c != 'Y' && c != 'N');
 					if (c == 'Y') {
-						if (gamestate::save.empty()) {
-							std::getline(std::cin, gamestate::save);
+						if (game::save.empty()) {
+							std::getline(std::cin, game::save);
 							std::cout << "Enter a filename: ";
-							std::getline(std::cin, gamestate::save);
+							std::getline(std::cin, game::save);
 						}
-						std::ofstream out(gamestate::save, std::ios::trunc);
+						std::ofstream out(game::save, std::ios::trunc);
 						for (int i = 0; i < res::loader::levels.size(); i++) {
 							out << ' ' << res::loader::levels.data()[i].hint << '\n';
 							const object& p = res::loader::levels.data()[i].objects.data()[0];
@@ -233,9 +235,10 @@ int main(void) {
 								out << (int)obj.type << ' ' << obj.x << ' ' << obj.y << ' ' << (int)obj.orientation;
 								if (obj.type == object::enum_type::MOVING_WALL
 									|| obj.type == object::enum_type::MOVING_BLOCK
-									|| obj.type == object::enum_type::MOVING_CRYSTAL) {
+									|| obj.type == object::enum_type::MOVING_CRYSTAL)
 									out << ' ' << obj.x2 << ' ' << obj.y2 << ' ' << obj.data;
-								}
+								else if (obj.type == object::enum_type::DOOR || obj.type == object::enum_type::MIRROR_DOOR)
+									out << ' ' << obj.data;
 								out << '\n';
 							}
 						}
@@ -257,7 +260,7 @@ int main(void) {
 						std::cout << "Failed to read level file" << std::endl;
 						res::loader::load_default();
 					}
-					gamestate::save = path;
+					game::save = path;
 				}
 				else
 					std::cout << "File not found" << std::endl;
@@ -277,7 +280,7 @@ int main(void) {
 					if (c == 'N')
 						continue;
 				}
-				gamestate::save = path;
+				game::save = path;
 				std::ofstream out(path, std::ios::trunc);
 				for (int i = 0; i < res::loader::levels.size(); i++) {
 					out << ' ' << res::loader::levels.data()[i].hint << '\n';
@@ -289,9 +292,10 @@ int main(void) {
 						out << (int)obj.type << ' ' << obj.x << ' ' << obj.y << ' ' << (int)obj.orientation;
 						if (obj.type == object::enum_type::MOVING_WALL
 							|| obj.type == object::enum_type::MOVING_BLOCK
-							|| obj.type == object::enum_type::MOVING_CRYSTAL) {
+							|| obj.type == object::enum_type::MOVING_CRYSTAL)
 							out << ' ' << obj.x2 << ' ' << obj.y2 << ' ' << obj.data;
-						}
+						else if (obj.type == object::enum_type::DOOR || obj.type == object::enum_type::MIRROR_DOOR)
+							out << ' ' << obj.data;
 						out << '\n';
 					}
 				}
@@ -303,11 +307,11 @@ int main(void) {
 				out.close();
 			}
 			else if (cmd == "save") {
-				if (gamestate::save.empty()) {
+				if (game::save.empty()) {
 					std::cout << "No level file loaded. Try `export`." << std::endl;
 					continue;
 				}
-				std::ofstream out(gamestate::save, std::ios::trunc);
+				std::ofstream out(game::save, std::ios::trunc);
 				for (int i = 0; i < res::loader::levels.size(); i++) {
 					out << ' ' << res::loader::levels.data()[i].hint << '\n';
 					const object& p = res::loader::levels.data()[i].objects.data()[0];
@@ -318,9 +322,10 @@ int main(void) {
 						out << (int)obj.type << ' ' << obj.x << ' ' << obj.y << ' ' << (int)obj.orientation;
 						if (obj.type == object::enum_type::MOVING_WALL
 							|| obj.type == object::enum_type::MOVING_BLOCK
-							|| obj.type == object::enum_type::MOVING_CRYSTAL) {
+							|| obj.type == object::enum_type::MOVING_CRYSTAL)
 							out << ' ' << obj.x2 << ' ' << obj.y2 << ' ' << obj.data;
-						}
+						else if (obj.type == object::enum_type::DOOR || obj.type == object::enum_type::MIRROR_DOOR)
+							out << ' ' << obj.data;
 						out << '\n';
 					}
 				}
@@ -347,10 +352,14 @@ int main(void) {
 				}
 				catch (...) {
 					std::cout << "Invalid input" << std::endl;
+					std::string s;
+					std::getline(std::cin, s);
 					continue;
 				}
 				if (n < 1) {
 					std::cout << "Invalid input" << std::endl;
+					std::string s;
+					std::getline(std::cin, s);
 					continue;
 				}
 				if ((size_t)(n - 1) == res::loader::levels.size()) {
@@ -363,7 +372,7 @@ int main(void) {
 					unsaved = true;
 				}
 				if ((size_t)(n - 1) <= res::loader::levels.size())
-					gamestate::level = n - 1;
+					game::level = n - 1;
 				else
 					std::cout << "Cannot create level " << n << " as level "
 						<< res::loader::levels.size() + 1 << " does not exist yet" << std::endl;
@@ -377,10 +386,14 @@ int main(void) {
 				}
 				catch (...) {
 					std::cout << "Invalid input" << std::endl;
+					std::string s;
+					std::getline(std::cin, s);
 					continue;
 				}
 				if (n < 1) {
 					std::cout << "Invalid input" << std::endl;
+					std::string s;
+					std::getline(std::cin, s);
 					continue;
 				}
 				if (res::loader::levels.size() <= 1) {
@@ -408,18 +421,21 @@ int main(void) {
 				}
 				catch (...) {
 					std::cout << "Invalid input" << std::endl;
+					std::string s;
+					std::getline(std::cin, s);
 					continue;
 				}
-				res::loader::levels.data()[gamestate::level].randomize = r;
+				res::loader::levels.data()[game::level].randomize = r;
+				unsaved = true;
 			}
 			else if (cmd == "text") {
 				std::string text;
 				std::getline(std::cin, text);
-				res::loader::levels.data()[gamestate::level].hint = text.substr(1);
+				res::loader::levels.data()[game::level].hint = text.substr(1);
 				unsaved = true;
 			}
 			else if (cmd == "rmtext") {
-				res::loader::levels.data()[gamestate::level].hint.clear();
+				res::loader::levels.data()[game::level].hint.clear();
 				unsaved = true;
 			}
 			else if (cmd == "list") {
@@ -443,51 +459,68 @@ int main(void) {
 				}
 				catch (...) {
 					std::cout << "Invalid input" << std::endl;
+					std::string s;
+					std::getline(std::cin, s);
 					continue;
 				}
 				if (o < 0 || o > (int)object::enum_orientation::NONE
 					|| type < 0 || type > (int)object::enum_type::NONE) {
 					std::cout << "Invalid input" << std::endl;
+					std::string s;
+					std::getline(std::cin, s);
 					continue;
 				}
 				object::enum_type t = (object::enum_type)type;
 				current->push_back(object(x, y, 20, 20,
 					(object::enum_orientation)o, t,
 					res::loader::get_tex(t), res::loader::get_hbx(t), 0));
-				if (t == object::enum_type::MOVING_WALL
-					|| t == object::enum_type::MOVING_BLOCK
-					|| t == object::enum_type::MOVING_CRYSTAL) {
+				if (std::find(toggleable, end, t) != end) {
 					int x2, y2, link;
-					while (1) {
-						try {
-							std::cout << "This object can move. Enter the other point ([x2] [y2]) that this object can move to: ";
-							std::string _x2, _y2;
-							std::cin >> _x2 >> _y2;
-							x2 = std::stoi(_x2);
-							y2 = std::stoi(_y2);
-							break;
-						}
-						catch (...) {
-							std::cout << "Invalid input" << std::endl;
+					if (t == object::enum_type::MOVING_WALL
+						|| t == object::enum_type::MOVING_BLOCK
+						|| t == object::enum_type::MOVING_CRYSTAL) {
+						while (1) {
+							try {
+								std::cout << "This object can move. Enter the other point ([x2] [y2]) that this object can move to: ";
+								std::string _x2, _y2;
+								std::cin >> _x2 >> _y2;
+								x2 = std::stoi(_x2);
+								y2 = std::stoi(_y2);
+								break;
+							}
+							catch (...) {
+								std::cout << "Invalid input" << std::endl;
+								std::string s;
+								std::getline(std::cin, s);
+							}
 						}
 					}
 					while (1) {
 						try {
-							std::cout << "Enter a number. All moving objects with the same number (except 0) will move in tandem. ";
+							std::cout << "Enter a number. All toggleable objects with the same number (except 0) will move in tandem. ";
 							std::string _link;
 							std::cin >> _link;
 							link = std::stoi(_link);
-							if (link < 0)
+							if (link < 0) {
 								std::cout << "Invalid input" << std::endl;
+								std::string s;
+								std::getline(std::cin, s);
+							}
 							else
 								break;
 						}
 						catch (...) {
 							std::cout << "Invalid input" << std::endl;
+							std::string s;
+							std::getline(std::cin, s);
 						}
 					}
-					current->back().x2 = x2;
-					current->back().y2 = y2;
+					if (t == object::enum_type::MOVING_WALL
+						|| t == object::enum_type::MOVING_BLOCK
+						|| t == object::enum_type::MOVING_CRYSTAL) {
+						current->back().x2 = x2;
+						current->back().y2 = y2;
+					}
 					current->back().data = link;
 				}
 				unsaved = true;
@@ -504,12 +537,16 @@ int main(void) {
 				}
 				catch (...) {
 					std::cout << "Invalid input" << std::endl;
+					std::string s;
+					std::getline(std::cin, s);
 					continue;
 				}
 				id += 2;
 				if (id < 2 || id >= current->size()
 					|| o < 0 || o > (int)object::enum_orientation::NONE) {
 					std::cout << "Invalid input" << std::endl;
+					std::string s;
+					std::getline(std::cin, s);
 					continue;
 				}
 				current->data()[id].x = x;
@@ -528,11 +565,15 @@ int main(void) {
 				}
 				catch (...) {
 					std::cout << "Invalid input" << std::endl;
+					std::string s;
+					std::getline(std::cin, s);
 					continue;
 				}
 				id += 2;
 				if (id < 2 || id >= current->size()) {
 					std::cout << "Invalid input" << std::endl;
+					std::string s;
+					std::getline(std::cin, s);
 					continue;
 				}
 				std::cout << "type=" << (int)current->data()[id].type
@@ -550,10 +591,14 @@ int main(void) {
 				}
 				catch (...) {
 					std::cout << "Invalid input" << std::endl;
+					std::string s;
+					std::getline(std::cin, s);
 					continue;
 				}
 				if (id < 0 || id >= current->size() - 2) {
 					std::cout << "Invalid input" << std::endl;
+					std::string s;
+					std::getline(std::cin, s);
 					continue;
 				}
 				current->erase(current->begin() + (id + 2));
@@ -588,10 +633,14 @@ int main(void) {
 				}
 				catch (...) {
 					std::cout << "Invalid input" << std::endl;
+					std::string s;
+					std::getline(std::cin, s);
 					continue;
 				}
 				if (dir >= (int)photon::enum_direction::NONE) {
 					std::cout << "Invalid input" << std::endl;
+					std::string s;
+					std::getline(std::cin, s);
 					continue;
 				}
 				current->data()[0].x = x;
@@ -600,21 +649,21 @@ int main(void) {
 				unsaved = true;
 			}
 			else if (cmd == "preview") {
-				res::loader::load_level(gamestate::level, false);
+				res::loader::load_level(game::level, false);
 				preview = true;
 				glfwFocusWindow(window);
 				break;
 			}
 			else if (cmd == "play") {
 				std::cout << "Press ESC to return to the console." << std::endl;
-				res::loader::load_level(gamestate::level, false);
+				res::loader::load_level(game::level, false);
 				glfwFocusWindow(window);
 				break;
 			}
 			else if (cmd == "credits") {
 				std::cout << "This game uses the following libraries:\n";
 				std::cout << "GLFW: Copyright (c) 2002-2006 Marcus Geelnard, (c) 2006-2019 Camilla Löwy; licensed under the zlib License\n";
-				std::cout << "Glad: Copyright (c) 2013-2022 David Herberth; licensed under the MIT License" << std::endl;
+				std::cout << "glad: Copyright (c) 2013-2022 David Herberth; in the public domain" << std::endl;
 			}
 			else if (cmd == "quit" || cmd == "exit") {
 				if (unsaved) {
@@ -626,12 +675,12 @@ int main(void) {
 						c = std::toupper(s.front());
 					} while (c != 'Y' && c != 'N');
 					if (c == 'Y') {
-						if (gamestate::save.empty()) {
-							std::getline(std::cin, gamestate::save);
+						if (game::save.empty()) {
+							std::getline(std::cin, game::save);
 							std::cout << "Enter a filename: ";
-							std::getline(std::cin, gamestate::save);
+							std::getline(std::cin, game::save);
 						}
-						std::ofstream out(gamestate::save, std::ios::trunc);
+						std::ofstream out(game::save, std::ios::trunc);
 						for (int i = 0; i < res::loader::levels.size(); i++) {
 							out << ' ' << res::loader::levels.data()[i].hint << '\n';
 							const object& p = res::loader::levels.data()[i].objects.data()[0];
@@ -642,9 +691,10 @@ int main(void) {
 								out << (int)obj.type << ' ' << obj.x << ' ' << obj.y << ' ' << (int)obj.orientation;
 								if (obj.type == object::enum_type::MOVING_WALL
 									|| obj.type == object::enum_type::MOVING_BLOCK
-									|| obj.type == object::enum_type::MOVING_CRYSTAL) {
+									|| obj.type == object::enum_type::MOVING_CRYSTAL)
 									out << ' ' << obj.x2 << ' ' << obj.y2 << ' ' << obj.data;
-								}
+								else if (obj.type == object::enum_type::DOOR || obj.type == object::enum_type::MIRROR_DOOR)
+									out << ' ' << obj.data;
 								out << '\n';
 							}
 						}
@@ -661,8 +711,11 @@ int main(void) {
 				glfwTerminate();
 				exit(EXIT_SUCCESS);
 			}
-			else
+			else {
 				std::cout << "Unrecognized command" << std::endl;
+				std::string s;
+				std::getline(std::cin, s);
+			}
 		}
 		while (!glfwWindowShouldClose(window)) {
 			glfwPollEvents();
@@ -691,12 +744,12 @@ int main(void) {
 					if (it->_tick < len && it->_tick != 0)
 						len = it->_tick;
 				}
-				int fails = gamestate::failures, level = gamestate::level;
+				int fails = game::failures, level = game::level;
 				for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end();)
 					it->tick(tps, len, &it);
-				if (gamestate::level > level)
+				if (game::level > level)
 					break;
-				else if (gamestate::failures == fails) {
+				else if (game::failures == fails) {
 					bool fail = true;
 					for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end(); ++it) {
 						if (it->direction != photon::enum_direction::NONE) {
@@ -728,20 +781,114 @@ int main(void) {
 				else
 					res::loader::load_level(level, false);
 				if (cur < next || skipped > 5) {
-					glClear(GL_COLOR_BUFFER_BIT);
-					for (int layer = 0; layer < 7; layer++)
-						for (int i = 0; i < res::objects.size(); i++)
-							res::objects.data()[i].render(layer);
-					if (object::selected) {
-						if (object::selected->linked) {
-							for (int i = 0; i < object::selected->linked->members.size(); i++)
-								object::selected->linked->members.data()[i]->border();
+					if ((game::frame % 10 - game::frame % 2) && !object::invalidate_all) {
+						for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end(); ++it) {
+							glEnable(GL_SCISSOR_TEST);
+							glScissor(
+								(GLint)std::round(it->_x - 480.0 / tps) * PX_SIZE, (GLint)std::round(it->_y - 480.0 / tps) * PX_SIZE,
+								(GLsizei)(PX_SIZE * 960.0 / tps), (GLsizei)(PX_SIZE * 960.0 / tps));
+							glUniform4fv(glGetUniformLocation(res::shaders::rectangle, "colour"),
+								1, rect::background.colour.ptr());
+							glUniform1f(glGetUniformLocation(res::shaders::rectangle, "noise"),
+								rect::background.noise);
+							glUniform1f(glGetUniformLocation(res::shaders::rectangle, "pxsize"), (GLfloat)PX_SIZE);
+							glUniform2f(glGetUniformLocation(res::shaders::rectangle, "offset"),
+								(GLfloat)res::objects.data()[0].offset,
+								(GLfloat)res::objects.data()[0].offset);
+							glUseProgram(res::shaders::rectangle);
+							glBindVertexArray(res::rect_vao);
+							glDrawArrays(GL_TRIANGLES, 0, 6);
+							glBindVertexArray(0);
+							glDisable(GL_SCISSOR_TEST);
 						}
-						else
-							object::selected->border();
+						if (object::selected) {
+							if (object::selected->linked) {
+								for (int i = 0; i < object::selected->linked->members.size(); i++)
+									object::selected->linked->members.data()[i]->border(true);
+							}
+							else
+								object::selected->border(true);
+						}
+						for (int i = 1; i < res::objects.size(); i++) {
+							object& obj = res::objects.data()[i];
+							if (std::any_of(photon::photons.begin(), photon::photons.end(), [obj, tps](photon p) {
+								return obj.type != object::enum_type::NONE
+									&& obj_dist(p._x, p._y, obj) <= 960.0 / tps;
+							}))
+								object::invalidated.push_back(&obj);
+							if (object::previous && object::previous->linked
+								&& std::any_of(object::previous->linked->members.begin(), object::previous->linked->members.end(),
+									[obj](object* o) { return o == &obj; }))
+								object::invalidated.push_back(&obj);
+							if (object::selected && object::selected->linked
+								&& std::any_of(object::selected->linked->members.begin(), object::selected->linked->members.end(),
+									[obj](object* o) {
+								object temp = *o;
+								temp.x -= 4;
+								temp.y -= 4;
+								temp.width += 8;
+								temp.height += 8;
+								return object::overlapping(temp, obj);
+							}))
+								object::invalidated.push_back(&obj);
+							else if (object::selected && !object::selected->linked) {
+								object temp = *object::selected;
+								temp.x -= 4;
+								temp.y -= 4;
+								temp.width += 8;
+								temp.height += 8;
+								if (object::overlapping(temp, obj))
+									object::invalidated.push_back(&obj);
+							}
+						}
+						if (object::previous && !object::previous->linked)
+							object::invalidated.push_back(object::previous);
+						for (size_t count = -1; count != object::invalidated.size(); count = object::invalidated.size()) {
+							for (int i = 1; i < res::objects.size(); i++) {
+								object& obj = res::objects.data()[i];
+								if (std::any_of(object::invalidated.begin(), object::invalidated.end(), [obj, tps](object* other) {
+									return obj.type != object::enum_type::NONE
+										&& object::overlapping(obj, *other);
+								}))
+									object::invalidated.push_back(&obj);
+							}
+						}
+						for (int layer = -1; layer < 7; layer++)
+							for (int i = 0; i < object::invalidated.size(); i++)
+								object::invalidated.data()[i]->render(layer);
+						if (game::frame % 2)
+							object::invalidated.clear();
+						if (object::selected) {
+							if (object::selected->linked) {
+								for (int i = 0; i < object::selected->linked->members.size(); i++)
+									object::selected->linked->members.data()[i]->border();
+							}
+							else
+								object::selected->border();
+						}
+						for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end(); ++it)
+							it->render();
 					}
-					for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end(); ++it)
-						it->render();
+					else {
+						if (object::invalidate_all)
+							game::frame = 0;
+						object::invalidated.clear();
+						object::invalidate_all = false;
+						glClear(GL_COLOR_BUFFER_BIT);
+						for (int layer = 0; layer < 7; layer++)
+							for (int i = 0; i < res::objects.size(); i++)
+								res::objects.data()[i].render(layer);
+						if (object::selected) {
+							if (object::selected->linked) {
+								for (int i = 0; i < object::selected->linked->members.size(); i++)
+									object::selected->linked->members.data()[i]->border();
+							}
+							else
+								object::selected->border();
+						}
+						for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end(); ++it)
+							it->render();
+					}
 					glfwSwapBuffers(window);
 					skipped = 1;
 				}

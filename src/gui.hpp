@@ -92,7 +92,6 @@ namespace gui {
 
 	std::string time(double t);
 
-	extern size_t frame;
 	extern bool menu;
 	extern bool quit;
 	extern std::vector<element*> elements;

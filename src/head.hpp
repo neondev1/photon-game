@@ -5,6 +5,7 @@
 // Why did I use them? I don't even know anymore
 #include <deque>
 #include <list>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -58,6 +59,7 @@ public:
 	static std::vector<object*> invalidated;
 	static bool invalidate_all;
 	static std::list<group> groups;
+	static std::unordered_map<unsigned, std::vector<rect>> temp_tex;
 
 	enum class enum_orientation {
 		N, NNW, NW, NWW,
@@ -82,14 +84,16 @@ public:
 	enum_orientation orientation;
 	enum_type type;
 	int data;
-	std::vector<struct rect>* texture;
+	std::vector<rect>* texture;
 	// There might eventually be objects with multiple hitboxes
 	std::vector<struct box>* hitbox;
 	
 	object(void);
 	object(double x, double y, int width, int height, enum_orientation direction, enum_type type,
-		std::vector<struct rect>* tex, std::vector<struct box>* hbox, int data);
+		std::vector<rect>* tex, std::vector<struct box>* hbox, int data);
 	
+	static bool overlapping(const object& obj1, const object& obj2);
+
 	void render(int layer) const;
 	void border(bool clear = false) const;
 	void tick(int tps);
@@ -137,7 +141,7 @@ public:
 	std::deque<int> immune;
 	std::deque<object*> interacted;
 	
-	photon(std::vector<struct rect>* texture, double x, double y, enum_direction dir, int dc, int split, node* parent);
+	photon(std::vector<rect>* texture, double x, double y, enum_direction dir, int dc, int split, node* parent);
 
 	void render(void) const;
 	inline bool on_screen(void) const { return _x < 1280.0 / PX_SIZE && _x + width > 0.0 && _y < 720.0 / PX_SIZE && _y + height > 0.0; }
@@ -212,9 +216,10 @@ namespace keybinds {
 	extern int hint;
 }
 
-namespace gamestate {
+namespace game {
 	extern bool started;
 	extern bool hint;
+	extern long long frame;
 	extern bool hardcore;
 	extern int level;
 	extern int failures;

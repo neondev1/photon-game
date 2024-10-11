@@ -1,4 +1,7 @@
 /*
+	This code is probably in the public domain
+	(https://github.com/Dav1dde/glad/blob/glad2/README.md#license)
+
 	The Khronos Specifications:
 
 	Copyright (c) 2013-2020 The Khronos Group Inc.
@@ -14,7 +17,6 @@
     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
     See the License for the specific language governing permissions and
     limitations under the License.
-
 */
 
 // https://github.com/KhronosGroup/OpenGL-Registry/issues/376

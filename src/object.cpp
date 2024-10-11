@@ -25,7 +25,7 @@ object::object(void) :
 	texture(NULL), hitbox(NULL), data(0) {}
 
 object::object(double x, double y, int width, int height, enum_orientation orientation, enum_type type,
-	std::vector<struct rect>* tex, std::vector<struct box>* hbox, int data) :
+	std::vector<rect>* tex, std::vector<struct box>* hbox, int data) :
 	x((int)x), y((int)y), _x(x), _y(y), width(width), height(height),
 	x1((int)x), y1((int)y), x2((int)x), y2((int)y),
 	offset(rand() / ((RAND_MAX + 1) / 256)), toggle(false), moving(false),
@@ -37,6 +37,23 @@ object* object::previous = NULL;
 std::vector<object*> object::invalidated;
 bool object::invalidate_all;
 std::list<group> object::groups;
+std::unordered_map<unsigned, std::vector<rect>> object::temp_tex;
+
+bool object::overlapping(const object& obj1, const object& obj2) {
+	const int __x1[4] = { _round(obj1._x), _round(obj1._x), _round(obj1._x + obj1.width), _round(obj1._x + obj1.width) };
+	const int __y1[4] = { _round(obj1._y), _round(obj1._y + obj1.height), _round(obj1._y + obj1.height), _round(obj1._y) };
+	const int __x2[4] = { _round(obj2._x), _round(obj2._x), _round(obj2._x + obj2.width), _round(obj2._x + obj2.width) };
+	const int __y2[4] = { _round(obj2._y), _round(obj2._y + obj2.height), _round(obj2._y + obj2.height), _round(obj2._y) };
+	for (int i = 0; i < 4; i++) {
+		if (__x1[i] > _round(obj2._x) && __x1[i] < _round(obj2._x + obj2.width)
+			&& __y1[i] > _round(obj2._y) && __y1[i] < _round(obj2._y + obj2.height))
+			return true;
+		if (__x2[i] > _round(obj1._x) && __x2[i] < _round(obj1._x + obj1.width)
+			&& __y2[i] > _round(obj1._y) && __y2[i] < _round(obj1._y + obj1.height))
+			return true;
+	}
+	return false;
+}
 
 void object::render(int layer) const {
 	if (!on_screen())
@@ -92,8 +109,9 @@ void object::render(int layer) const {
 			glBindVertexArray(0);
 			glDisable(GL_SCISSOR_TEST);
 		}
+		return;
 	}
-	std::vector<struct rect>* tex = texture;
+	std::vector<rect>* tex = texture;
 	switch (type) {
 	case enum_type::DOOR:
 	case enum_type::MIRROR_DOOR:
@@ -110,19 +128,78 @@ void object::render(int layer) const {
 		tex += (int)orientation % 8 / 2;
 		break;
 	case enum_type::BOMB:
-		tex += (int)gamestate::hardcore;
+		tex += (int)game::hardcore;
 		break;
 	default:
 		break;
 	}
+	if (width != 20 || height != 20) {
+		std::unordered_map<unsigned, std::vector<rect>>::iterator it;
+		unsigned key = (unsigned short)width | ((unsigned short)height << 12) | ((unsigned char)type << 24);
+		if (type == enum_type::DOOR)
+			key |= (unsigned char)toggle << 31;
+		const static enum_type types[] = {
+			enum_type::WALL, enum_type::FIXED_BLOCK, enum_type::SPDC_CRYSTAL,
+			enum_type::MOVING_WALL, enum_type::MOVING_BLOCK, enum_type::MOVING_CRYSTAL
+		};
+		const static enum_type* end = types + sizeof(types) / sizeof(enum_type);
+		if ((it = object::temp_tex.find(key)) != object::temp_tex.end())
+			tex = &it->second;
+		else if (std::find(types, end, type) != end || (!toggle && type == enum_type::DOOR)) {
+			object::temp_tex[key] = *tex;
+			tex = &object::temp_tex[key];
+			for (int i = 0; i < tex->size(); i++) {
+				rect& r = tex->data()[i];
+				if (r.width == 1 && r.height == 1) {
+					if (r.x + r.y > 20) {
+						r.x += width - 20;
+						r.y += height - 20;
+					}
+				}
+				else if (r.width == 1) {
+					r.x += width - 20;
+					r.height += height - 20;
+				}
+				else if (r.height == 1) {
+					r.y += height - 20;
+					r.width += width - 20;
+				}
+				else {
+					r.width += width - 20;
+					r.height += height - 20;
+				}
+			}
+		}
+		else if (type == enum_type::DOOR) {
+			const static vec colour = vec(0.3f, 0.35f, 0.38f, 0.5f);
+			tex = &object::temp_tex[key];
+			int __x = 1, __y = 0;
+			const int xmax = width - 2;
+			const int ymax = height - 2;
+			for (; __x <= xmax; __x += 5) {
+				int w = 3;
+				while (__x + w > xmax + 1)
+					w--;
+				tex->push_back({ __x, __y, w, 1, colour, 4.0f, 0 });
+				tex->push_back({ __x, ymax + 1, w, 1, colour, 4.0f, 0 });
+			}
+			__x = 0;
+			__y = 1;
+			for (; __y <= ymax; __y += 5) {
+				int h = 3;
+				while (__y + h > ymax + 1)
+					h--;
+				tex->push_back({ __x, __y, 1, h, colour, 4.0f, 0 });
+				tex->push_back({ xmax + 1, __y, 1, h, colour, 4.0f, 0 });
+			}
+		}
+	}
 	for (int i = 0; i < tex->size(); i++) {
 		const rect& quad = tex->data()[i];
-		if (layer >= 0) {
-			if (quad.layer < layer)
-				continue;
-			if (quad.layer > layer)
-				return;
-		}
+		if (quad.layer < layer)
+			continue;
+		if (quad.layer > layer)
+			return;
 		GLint __x = _round((_x + quad.x) * PX_SIZE);
 		GLint __y = _round((_y + quad.y) * PX_SIZE);
 		GLsizei w = quad.width * PX_SIZE;
@@ -173,8 +250,8 @@ void object::border(bool clear) const {
 	else {
 		int __x = _round((_x - 3) * PX_SIZE);
 		int __y = _round((_y - 4) * PX_SIZE);
-		int xmax = _round((_x + width + 2) * PX_SIZE);
-		int ymax = _round((_y + height + 2) * PX_SIZE);
+		const int xmax = _round((_x + width + 2) * PX_SIZE);
+		const int ymax = _round((_y + height + 2) * PX_SIZE);
 		for (; __x <= xmax; __x += 7 * PX_SIZE) {
 			int w = 5 * PX_SIZE;
 			while (__x + w > xmax + PX_SIZE)
@@ -277,7 +354,7 @@ void group::add(object* obj) {
 
 // photon
 
-photon::photon(std::vector<struct rect>* tex, double x, double y, enum_direction dir, int dc, int split, node* parent) :
+photon::photon(std::vector<rect>* tex, double x, double y, enum_direction dir, int dc, int split, node* parent) :
 	object(x, y, 4, 4, enum_orientation::NONE, enum_type::NONE, NULL, NULL, 0),
 	_tick(0.0), medium(NULL), direction(dir), dc(dc), split(split), parent(parent),
 	interacting(NULL), i_hbox(), i_line(0) {

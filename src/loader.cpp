@@ -167,6 +167,16 @@ bool res::loader::load_from_file(std::string path) {
 			levels.back().objects.back().y2 = y2;
 			levels.back().objects.back().data = data;
 		}
+		if (t == object::enum_type::DOOR
+			|| t == object::enum_type::MIRROR_DOOR) {
+			int data;
+			iss >> data;
+			if (iss.fail() || data < 0) {
+				in.close();
+				return false;
+			}
+			levels.back().objects.back().data = data;
+		}
 	}
 	in.close();
 	return true;
@@ -179,26 +189,30 @@ void res::loader::load_level(int level, bool randomize_orientation) {
 	photon::nodes.clear();
 	photon::photons.clear();
 	object::invalidated.clear();
+	object::temp_tex.clear();
+	object::selected = NULL;
 	res::objects.clear();
 	res::objects.resize(res::loader::levels[level].objects.size() - 1);
 	std::memcpy(res::objects.data(),
 		res::loader::levels.data()[level].objects.data() + 1,
 		std::min(res::objects.size(), res::loader::levels.data()[level].objects.size() - 1) * sizeof(object));
+	const int p_x = res::loader::levels.data()[level].objects.data()[0].x;
+	const int p_y = res::loader::levels.data()[level].objects.data()[0].y;
 	photon::photons.push_back(photon(
-		TEX(0),
-		res::loader::levels.data()[level].objects.data()[0].x,
-		res::loader::levels.data()[level].objects.data()[0].y,
+		TEX_PHOTON, p_x, p_y,
 		(photon::enum_direction)res::loader::levels.data()[level].objects.data()[0].data,
-		0, 0,
-		NULL
+		0, 0, NULL
 	));
-	gamestate::sensors = 0;
+	game::sensors = 0;
 	object::groups.clear();
+	const static object::enum_type toggleable[] = {
+		object::enum_type::DOOR, object::enum_type::MIRROR_DOOR,
+		object::enum_type::MOVING_WALL, object::enum_type::MOVING_BLOCK, object::enum_type::MOVING_CRYSTAL
+	};
+	const static object::enum_type* t_end = toggleable + sizeof(toggleable) / sizeof(object::enum_type);
 	for (int i = 0; i < res::objects.size(); i++) {
 		object& obj = res::objects.data()[i];
-		if (obj.data && (obj.type == object::enum_type::MOVING_WALL
-			|| obj.type == object::enum_type::MOVING_BLOCK
-			|| obj.type == object::enum_type::MOVING_CRYSTAL)) {
+		if (obj.data && std::find(toggleable, t_end, obj.type) != t_end) {
 			while (obj.data > object::groups.size())
 				object::groups.push_back(group());
 			std::list<group>::iterator it = object::groups.begin();
@@ -207,7 +221,7 @@ void res::loader::load_level(int level, bool randomize_orientation) {
 			it->add(&obj);
 		}
 		else if (obj.type == object::enum_type::SENSOR)
-			gamestate::sensors++;
+			game::sensors++;
 		if ((randomize_orientation && res::loader::levels.data()[level].randomize)
 			|| obj.orientation == object::enum_orientation::NONE) {
 			if (obj.type == object::enum_type::MIRROR)
@@ -216,16 +230,33 @@ void res::loader::load_level(int level, bool randomize_orientation) {
 				obj.orientation = (object::enum_orientation)(rand() / ((RAND_MAX + 1) / 8) * 2);
 		}
 	}
-	gamestate::activated = 0;
-	object::selected = res::objects.size() > 1 ? &res::objects.data()[1] : NULL;
+	game::activated = 0;
+	const static object::enum_type unselectables[] = {
+		object::enum_type::WALL,
+		object::enum_type::DIAGONAL_MIRROR, object::enum_type::MIRROR_BLOCK,
+		object::enum_type::FIXED_BLOCK, object::enum_type::PRISM,
+		object::enum_type::SPDC_CRYSTAL,
+		object::enum_type::BOMB, object::enum_type::SENSOR,
+		object::enum_type::NONE
+	};
+	const static object::enum_type* u_end = unselectables + sizeof(unselectables) / sizeof(object::enum_type);
+	double best = DBL_MAX;
+	for (int i = 1; i < res::objects.size(); i++) {
+		double dist = 0.0;
+		if (std::find(unselectables, u_end, res::objects.data()[i].type) == u_end
+			&& (dist = obj_dist(p_x, p_y, res::objects.data()[i])) < best) {
+			best = dist;
+			object::selected = &res::objects.data()[i];
+		}
+	}
 	if (!res::loader::levels.data()[level].hint_seen
 		&& !res::loader::levels.data()[level].hint.empty()) {
-		gamestate::hint = true;
+		game::hint = true;
 		res::loader::levels.data()[level].hint_seen = true;
 	}
 }
 
-namespace gamestate {
+namespace game {
 	bool started = false;
 	bool hint = false;
 	bool hardcore = false;

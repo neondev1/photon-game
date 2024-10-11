@@ -348,10 +348,10 @@ bool interact(photon* const p, double dist, object* const obj,
 	case object::enum_type::BOMB: {
 		node* n = p->parent;
 		if (!n)
-			gamestate::failures++;
+			game::failures++;
 		else if (n->type == node::enum_node::SUPERPOS) {
 			if (search_nodes(n, [p](photon* other) { return other->split > p->split; })) {
-				gamestate::failures++;
+				game::failures++;
 				return true;
 			}
 			p->destroy();
@@ -384,13 +384,13 @@ bool interact(photon* const p, double dist, object* const obj,
 		else {
 			node* np = n->parent;
 			if (!np) {
-				gamestate::failures++;
+				game::failures++;
 				return true;
 			}
 			n->destroy();
 			photon::deleting.insert(n);
 			if (!search_nodes(np, [p](photon* other) { return other->parent != p->parent && other->split <= p->split; })) {
-				gamestate::failures++;
+				game::failures++;
 				return true;
 			}
 			int absorbed = 0;
@@ -438,9 +438,9 @@ bool interact(photon* const p, double dist, object* const obj,
 			if (n->children.size() > 1) {
 				if (!obj->data) {
 					obj->data = 1;
-					gamestate::activated++;
-					if (gamestate::activated >= gamestate::sensors)
-						gamestate::level++;
+					game::activated++;
+					if (game::activated >= game::sensors)
+						game::level++;
 				}
 				return true;
 			}
@@ -448,9 +448,9 @@ bool interact(photon* const p, double dist, object* const obj,
 				if (!n->items.empty()) {
 					if (!obj->data) {
 						obj->data = 1;
-						gamestate::activated++;
-						if (gamestate::activated >= gamestate::sensors)
-							gamestate::level++;
+						game::activated++;
+						if (game::activated >= game::sensors)
+							game::level++;
 					}
 					return true;
 				}
@@ -462,9 +462,9 @@ bool interact(photon* const p, double dist, object* const obj,
 				if (n->items.size() > 1) {
 					if (!obj->data) {
 						obj->data = 1;
-						gamestate::activated++;
-						if (gamestate::activated >= gamestate::sensors)
-							gamestate::level++;
+						game::activated++;
+						if (game::activated >= game::sensors)
+							game::level++;
 					}
 					return true;
 				}
@@ -492,9 +492,9 @@ bool interact(photon* const p, double dist, object* const obj,
 			if (np->children.size() > 1) {
 				if (!obj->data) {
 					obj->data = 1;
-					gamestate::activated++;
-					if (gamestate::activated >= gamestate::sensors)
-						gamestate::level++;
+					game::activated++;
+					if (game::activated >= game::sensors)
+						game::level++;
 				}
 				return true;
 			}
@@ -502,9 +502,9 @@ bool interact(photon* const p, double dist, object* const obj,
 				if (!np->items.empty()) {
 					if (!obj->data) {
 						obj->data = 1;
-						gamestate::activated++;
-						if (gamestate::activated >= gamestate::sensors)
-							gamestate::level++;
+						game::activated++;
+						if (game::activated >= game::sensors)
+							game::level++;
 					}
 					return true;
 				}
@@ -516,9 +516,9 @@ bool interact(photon* const p, double dist, object* const obj,
 				if (np->items.size() > 1) {
 					if (!obj->data) {
 						obj->data = 1;
-						gamestate::activated++;
-						if (gamestate::activated >= gamestate::sensors)
-							gamestate::level++;
+						game::activated++;
+						if (game::activated >= game::sensors)
+							game::level++;
 					}
 					return true;
 				}
@@ -535,9 +535,9 @@ bool interact(photon* const p, double dist, object* const obj,
 		}
 		if (!obj->data) {
 			obj->data = 1;
-			gamestate::activated++;
-			if (gamestate::activated >= gamestate::sensors)
-				gamestate::level++;
+			game::activated++;
+			if (game::activated >= game::sensors)
+				game::level++;
 		}
 		return true;
 	}
@@ -552,7 +552,7 @@ void select(int key) {
 		return;
 	object::previous = object::selected;
 	object* best = NULL;
-	static object::enum_type unselectables[] = {
+	const static object::enum_type unselectables[] = {
 		object::enum_type::WALL,
 		object::enum_type::DIAGONAL_MIRROR, object::enum_type::MIRROR_BLOCK,
 		object::enum_type::FIXED_BLOCK, object::enum_type::PRISM,
@@ -560,7 +560,7 @@ void select(int key) {
 		object::enum_type::BOMB, object::enum_type::SENSOR,
 		object::enum_type::NONE
 	};
-	object::enum_type* end = unselectables + sizeof(unselectables) / sizeof(object::enum_type);
+	const static object::enum_type* end = unselectables + sizeof(unselectables) / sizeof(object::enum_type);
 	// I'm sorry
 	if (key == keybinds::up) {
 		for (int i = 0; i < res::objects.size(); i++) {
