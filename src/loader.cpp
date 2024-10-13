@@ -107,61 +107,80 @@ std::vector<box>* res::loader::get_hbx(object::enum_type type) {
 	}
 }
 
+const rect& res::loader::background(int level) {
+	const object& obj = levels.data()[level].objects.data()[0];
+	static rect r = { 0, 0, 640, 320, vec(0.08f, 0.08f, 0.08f, 1.0f), 5.0f };
+	std::memcpy(&r.colour.r, &obj.x1, sizeof(float));
+	std::memcpy(&r.colour.g, &obj.x2, sizeof(float));
+	std::memcpy(&r.colour.b, &obj.y1, sizeof(float));
+	r.colour.a = 1.0f;
+	std::memcpy(&r.noise, &obj.y2, sizeof(float));
+	return r;
+}
+
+void res::loader::set_background(int level, const vec colour, float noise) {
+	object& obj = levels.data()[level].objects.data()[0];
+	std::memcpy(&obj.x1, &colour.r, sizeof(int));
+	std::memcpy(&obj.x2, &colour.g, sizeof(int));
+	std::memcpy(&obj.y1, &colour.b, sizeof(int));
+	std::memcpy(&obj.y2, &noise, sizeof(int));
+}
+
 void res::loader::load_default(void) {
 	levels.clear();
 	levels.push_back(level());
 	levels.back().objects.push_back(object(0.0, 0.0, 1, 1,
 		object::enum_orientation::NONE, object::enum_type::NONE, TEX_PHOTON, NULL,
-		(int)photon::enum_direction::E));
+		(int)photon::enum_direction::E, false));
 	levels.back().objects.push_back(object(0.0, 0.0, 640, 360,
-		object::enum_orientation::NONE, object::enum_type::NONE, NULL, NULL, 0));
-	levels.back().objects.push_back(object(200.0, 10.0, 30, 60,
-		object::enum_orientation::NONE, object::enum_type::DOOR, TEX_DOOR, NULL, 1));
-	levels.back().objects.push_back(object(230.0, 10.0, 50, 20,
-		object::enum_orientation::NONE, object::enum_type::DOOR, TEX_DOOR, NULL, 1));
-	levels.back().objects.push_back(object(300.0, 100.0, 20, 20,
-		object::enum_orientation::NONE, object::enum_type::DOOR, TEX_DOOR, NULL, 0));
-	levels.back().objects.push_back(object(500.0, 100.0, 20, 20,
-		object::enum_orientation::NONE, object::enum_type::SPDC_CRYSTAL, TEX_SPDC, NULL, 0));
+		object::enum_orientation::NONE, object::enum_type::NONE, NULL, NULL, 0, false));
+	for (int i = 0; i < levels.size(); i++)
+		set_background(i, object::default_colour, object::default_noise);
 }
 
 bool res::loader::load_from_file(std::string path) {
 	if (!std::filesystem::is_regular_file(path))
 		return false;
-	levels.clear();
+	std::vector<level> temp;
 	std::ifstream in(path);
+	std::string name;
+	std::getline(in, name);
 	std::string str;
 	while (std::getline(in, str)) {
-		bool randomize;
 		int x, y, dir;
 		if (str.data()[0] == ' ') {
-			levels.push_back(level());
-			levels.back().hint = str.substr(1);
-			in >> randomize >> x >> y >> dir;
+			temp.push_back(level());
+			temp.back().hint = str.substr(1);
+			int r, g, b, noise;
+			in >> x >> y >> dir >> r >> g >> b >> noise;
 			if (in.fail() || dir < 0 || dir >= (int)photon::enum_direction::NONE) {
 				in.close();
 				return false;
 			}
-			levels.back().randomize = randomize;
-			levels.back().objects.push_back(object(x, y, 1, 1,
-				object::enum_orientation::NONE, object::enum_type::NONE, TEX_PHOTON, NULL, dir));
-			levels.back().objects.push_back(object(0.0, 0.0, 640, 360,
-				object::enum_orientation::NONE, object::enum_type::NONE, NULL, NULL, 0));
+			temp.back().objects.push_back(object(x, y, 1, 1,
+				object::enum_orientation::NONE, object::enum_type::NONE, TEX_PHOTON, NULL, dir, false));
+			temp.back().objects.back().x1 = r;
+			temp.back().objects.back().x2 = g;
+			temp.back().objects.back().y1 = b;
+			temp.back().objects.back().y2 = noise;
+			temp.back().objects.push_back(object(0.0, 0.0, 640, 360,
+				object::enum_orientation::NONE, object::enum_type::NONE, NULL, NULL, 0, false));
 			std::getline(in, str);
 			continue;
 		}
-		int type;
+		int type, randomize;
 		std::istringstream iss(str);
-		iss >> type >> x >> y >> dir;
+		iss >> type >> x >> y >> dir >> randomize;
 		if (iss.fail() || type < 0 || type > (int)object::enum_type::NONE
 			|| dir < 0 || dir > (int)object::enum_orientation::NONE) {
 			in.close();
 			return false;
 		}
 		object::enum_type t = (object::enum_type)type;
-		levels.back().objects.push_back(object(x, y, 20, 20,
+		temp.back().objects.push_back(object(x, y, 20, 20,
 			(object::enum_orientation)dir, t,
-			res::loader::get_tex(t), res::loader::get_hbx(t), 0));
+			res::loader::get_tex(t), res::loader::get_hbx(t),
+			0, randomize != 0));
 		if (t == object::enum_type::MOVING_WALL
 			|| t == object::enum_type::MOVING_BLOCK
 			|| t == object::enum_type::MOVING_CRYSTAL) {
@@ -171,9 +190,9 @@ bool res::loader::load_from_file(std::string path) {
 				in.close();
 				return false;
 			}
-			levels.back().objects.back().x2 = x2;
-			levels.back().objects.back().y2 = y2;
-			levels.back().objects.back().data = data;
+			temp.back().objects.back().x2 = x2;
+			temp.back().objects.back().y2 = y2;
+			temp.back().objects.back().data = data;
 		}
 		if (t == object::enum_type::DOOR
 			|| t == object::enum_type::MIRROR_DOOR) {
@@ -183,10 +202,16 @@ bool res::loader::load_from_file(std::string path) {
 				in.close();
 				return false;
 			}
-			levels.back().objects.back().data = data;
+			temp.back().objects.back().data = data;
 		}
 	}
 	in.close();
+	levels.clear();
+	levels.resize(temp.size());
+	// Can't use `memcpy`; need to call copy constructors for `vector`s
+	std::copy(temp.begin(), temp.end(), levels.begin());
+	game::name = name;
+	game::custom = true;
 	return true;
 }
 
@@ -213,11 +238,11 @@ void res::loader::load_level(int level, bool randomize_orientation) {
 	));
 	game::sensors = 0;
 	object::groups.clear();
-	const static object::enum_type toggleable[] = {
+	static constexpr object::enum_type toggleable[] = {
 		object::enum_type::DOOR, object::enum_type::MIRROR_DOOR,
 		object::enum_type::MOVING_WALL, object::enum_type::MOVING_BLOCK, object::enum_type::MOVING_CRYSTAL
 	};
-	const static object::enum_type* t_end = toggleable + sizeof(toggleable) / sizeof(object::enum_type);
+	static const object::enum_type* t_end = toggleable + sizeof(toggleable) / sizeof(object::enum_type);
 	for (int i = 0; i < res::objects.size(); i++) {
 		object& obj = res::objects.data()[i];
 		if (obj.data && std::find(toggleable, t_end, obj.type) != t_end) {
@@ -230,16 +255,16 @@ void res::loader::load_level(int level, bool randomize_orientation) {
 		}
 		else if (obj.type == object::enum_type::SENSOR)
 			game::sensors++;
-		if ((randomize_orientation && res::loader::levels.data()[level].randomize)
+		if ((randomize_orientation && obj.randomize)
 			|| obj.orientation == object::enum_orientation::NONE) {
 			if (obj.type == object::enum_type::MIRROR)
-				obj.orientation = (object::enum_orientation)(rand() / ((RAND_MAX + 1) / 16));
+				obj.orientation = (object::enum_orientation)(mix32_rand(16));
 			else if (obj.type == object::enum_type::GLASS_BLOCK)
-				obj.orientation = (object::enum_orientation)(rand() / ((RAND_MAX + 1) / 8) * 2);
+				obj.orientation = (object::enum_orientation)(mix32_rand(8) * 2);
 		}
 	}
 	game::activated = 0;
-	const static object::enum_type unselectables[] = {
+	static constexpr object::enum_type unselectables[] = {
 		object::enum_type::WALL,
 		object::enum_type::DIAGONAL_MIRROR, object::enum_type::MIRROR_BLOCK,
 		object::enum_type::FIXED_BLOCK, object::enum_type::PRISM,
@@ -247,7 +272,7 @@ void res::loader::load_level(int level, bool randomize_orientation) {
 		object::enum_type::BOMB, object::enum_type::SENSOR,
 		object::enum_type::NONE
 	};
-	const static object::enum_type* u_end = unselectables + sizeof(unselectables) / sizeof(object::enum_type);
+	static const object::enum_type* u_end = unselectables + sizeof(unselectables) / sizeof(object::enum_type);
 	double best = DBL_MAX;
 	for (int i = 1; i < res::objects.size(); i++) {
 		double dist = 0.0;
@@ -274,4 +299,6 @@ namespace game {
 	int activated = 0;
 	double time = 0.0;
 	std::string save;
+	std::string name;
+	bool custom = false;
 }

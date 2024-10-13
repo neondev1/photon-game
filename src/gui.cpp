@@ -29,8 +29,8 @@ namespace gui {
 }
 
 void gui::load_gui(void) {
-	vec fore = vec(1.0f, 1.0f, 1.0f, 1.0f);
-	vec back = vec(0.2f, 0.2f, 0.2f, 0.4f);
+	const vec fore = vec(1.0f, 1.0f, 1.0f, 1.0f);
+	const vec back = vec(0.2f, 0.2f, 0.2f, 0.4f);
 	gui::elements.push_back(new gui::panel(0, 0, 1280, 720, true, vec(0.1f, 0.1f, 0.1f, 1.0f), 6.0f));
 	gui::elements.push_back(new gui::label(100, 100, 1000, true, "PHOTON", fore, 6));
 	gui::elements.push_back(new gui::button(100, 240, 90, 42, true, 10, "PLAY",
@@ -192,7 +192,7 @@ void gui::load_gui(void) {
 		for (; index < gui::elements.size() - 1
 			&& gui::elements.data()[index]->text.find("License") == std::string::npos; index++);
 		gui::elements.data()[index]->visible = !gui::elements.data()[index]->visible;
-		if (++count > 4 && !(rand() / ((RAND_MAX + 1) / 3))) {
+		if (++count > 4 && !mix32_rand(3)) {
 			index = 0;
 			for (; index < gui::elements.size() - 1
 				&& gui::elements.data()[index]->text.find("neondev1") == std::string::npos; index++);
@@ -254,7 +254,7 @@ void gui::load_gui(void) {
 	gui::elements.push_back(new gui::label(200, 255, 1000, false, "Unable to write to savefile", fore, 1));
 	gui::elements.push_back(new gui::label(290, 555, 1000, false, "File not found", fore, 1));
 	gui::elements.push_back(new gui::label(290, 555, 1000, false, "Invalid savefile", fore, 1));
-	gui::elements.push_back(new gui::label(100, 660, 1000, false, "This game uses the following libraries:\nGLFW: Copyright (c) 2002-2006 Marcus Geelnard, (c) 2006-2019 Camilla L" + STR(FONT_O_UMLAUT) + "wy; licensed under the zlib License\nglad: Copyright (c) 2013-2022 David Herberth; licensed under the MIT License", fore, 1));
+	gui::elements.push_back(new gui::label(100, 660, 1000, false, "This game uses the following libraries:\nGLFW: Copyright (c) 2002-2006 Marcus Geelnard, (c) 2006-2019 Camilla L" + STR(FONT_O_UMLAUT) + "wy; licensed under the zlib License\nglad: Created by David Herberth; in the public domain", fore, 1));
 	gui::elements.push_back(new gui::label(700, 100, 1000, false, "Fails: ", fore, 2));
 	gui::elements.push_back(new gui::label(700, 100, 1000, false, "Level: ", fore, 2));
 	gui::elements.push_back(new gui::label(718, 144, 1000, false, "Time: ", fore, 2));
@@ -384,7 +384,7 @@ gui::element::element(int x, int y, int width, bool visible,
 
 gui::panel::panel(int x, int y, int width, int height, bool visible,
 	vec colour, GLfloat noise) :
-	element(x, y, width, visible, "", colour), height(height), noise(noise), offset(rand() / ((RAND_MAX + 1) / 256)) { }
+	element(x, y, width, visible, "", colour), height(height), noise(noise), offset(mix32_rand(0x80000000U)) { }
 
 void gui::panel::render(void) {
 	if (!visible)

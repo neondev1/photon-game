@@ -17,7 +17,7 @@ Releases can probably be found under the "Releases" heading on the right-hand si
 
 If you want to build the binaries for Windows yourself, compile it in Visual Studio **using the Release option.** (I might switch to using CMake later, but for now I'm too lazy to do that.) If for some reason you want to build GLFW yourself using CMake, uncheck `USE_MSVC_RUNTIME_LIBRARY_DLL`. If for whatever reason statically linking the C++ runtime doesn't work, then change the runtime library setting to Multithreaded DLL (`/MD`) instead of Multithreaded (`/MT`) to dynamically link the runtime library (you might need to copy some required DLLs since the program might not know where to look for them).
 
-If you're targeting another operating system, you'll also need to compile the binaries yourself; in that case, make sure that you are using C++17 and to link to `opengl32.a`/`libopengl32.a`. You'll also need to compile your own `.a` files for GLFW; you might want to link the program statically when compiling and accordingly build the correct version of GLFW for static linkage if you do so. The source code of this program hopefully shouldn't contain anything Windows-specific, but I could be wrong.
+If you're targeting another operating system, you'll also need to compile the binaries yourself; in that case, make sure that you are using C++17 (for `std::filesystem` support) and to link to `opengl32.a`/`libopengl32.a`. You'll also need to compile your own `.a` files for GLFW; you might want to link the program statically when compiling and accordingly build the correct version of GLFW for static linkage if you do so. The source code hopefully shouldn't contain anything Windows-specific (except for some minor things that are enclosed in `#ifdef _WIN32`), but I could be wrong.
 
 ## Level Editor
 
@@ -26,7 +26,7 @@ I'll probably include the level editor alongside [releases](https://github.com/n
 To compile the level editor on Windows with MSVC, build the project in Visual Studio using the EditorRelease configuration. If you are compiling using something other than MSVC, simply exclude the original `main.cpp` file from compilation and include `editor/main.cpp` instead.
 
 > [!NOTE]
-> To load a custom level into the regular game client, rename the exported level file to `level` (no extension) and put it in the same directory as the executable. The game should automatically load the level when restarted.
+> To load a custom map into the regular game client, rename the exported level file to `levels` (no extension) and put it in the same directory as the executable. The game should automatically load the map when restarted. (In the future, I may create a map loader to make this easier.)
 
 ## Credits
 

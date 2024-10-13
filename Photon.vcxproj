@@ -306,6 +306,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='EditorRelease|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="src\object.cpp" />
+    <ClCompile Include="src\random.cpp" />
     <ClCompile Include="src\resources.cpp" />
   </ItemGroup>
   <ItemGroup>

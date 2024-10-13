@@ -110,7 +110,7 @@ int main(void) {
 	gui::load_gui();
 	res::loader::load_tex();
 	res::loader::load_hbx();
-	if (!res::loader::load_from_file("./level"))
+	if (!res::loader::load_from_file("./levels"))
 		res::loader::load_default();
 	res::shaders::load();
 	glfwSetCursorPosCallback(gui::window, move_cb);
@@ -313,12 +313,12 @@ int main(void) {
 					for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end(); ++it) {
 						glEnable(GL_SCISSOR_TEST);
 						glScissor(
-							(GLint)std::round(it->_x - 480.0 / tps)* PX_SIZE, (GLint)std::round(it->_y - 480.0 / tps)* PX_SIZE,
+							(GLint)std::round(it->_x - 480.0 / tps)* PX_SIZE, 40 + (GLint)std::round(it->_y - 480.0 / tps)* PX_SIZE,
 							(GLsizei)(PX_SIZE * 960.0 / tps), (GLsizei)(PX_SIZE * 960.0 / tps));
 						glUniform4fv(glGetUniformLocation(res::shaders::rectangle, "colour"),
-							1, rect::background.colour.ptr());
+							1, res::loader::background().colour.ptr());
 						glUniform1f(glGetUniformLocation(res::shaders::rectangle, "noise"),
-							rect::background.noise);
+							res::loader::background().noise);
 						glUniform1f(glGetUniformLocation(res::shaders::rectangle, "pxsize"), (GLfloat)PX_SIZE);
 						glUniform2f(glGetUniformLocation(res::shaders::rectangle, "offset"),
 							(GLfloat)res::objects.data()[0].offset,
@@ -339,14 +339,14 @@ int main(void) {
 					}
 					for (int i = 1; i < res::objects.size(); i++) {
 						object& obj = res::objects.data()[i];
-						const static object::enum_type translucent[] = {
+						static constexpr object::enum_type translucent[] = {
 							object::enum_type::DIAGONAL_MIRROR,
 							object::enum_type::GLASS_BLOCK, object::enum_type::FIXED_BLOCK,
 							object::enum_type::MOVING_BLOCK, object::enum_type::PRISM,
 							object::enum_type::SPDC_CRYSTAL, object::enum_type::MOVING_CRYSTAL,
 							object::enum_type::SPLITTER
 						};
-						const static object::enum_type* end = translucent + sizeof(translucent) / sizeof(object::enum_type);
+						static const object::enum_type* end = translucent + sizeof(translucent) / sizeof(object::enum_type);
 						if (std::find(translucent, end, obj.type) != end || (obj.toggle && (obj.type == object::enum_type::DOOR || obj.type == object::enum_type::MIRROR_DOOR)))
 							object::invalidated.insert(&obj);
 						else if ((obj.type == object::enum_type::DOOR || obj.type == object::enum_type::MIRROR_DOOR) && obj.toggle)
@@ -387,9 +387,7 @@ int main(void) {
 						for (int i = 1; i < res::objects.size(); i++) {
 							object& obj = res::objects.data()[i];
 							if (std::any_of(object::invalidated.begin(), object::invalidated.end(), [obj, tps](object* other) {
-								return obj.type != object::enum_type::NONE
-									&& object::overlapping(obj, *other);
-								}))
+								return obj.type != object::enum_type::NONE && object::overlapping(obj, *other);		}))
 								object::invalidated.insert(&obj);
 						}
 					}
@@ -399,16 +397,6 @@ int main(void) {
 							(*it)->render(layer);
 					if (game::frame % 2)
 						object::invalidated.clear();
-					if (object::selected) {
-						if (object::selected->linked) {
-							for (int i = 0; i < object::selected->linked->members.size(); i++)
-								object::selected->linked->members.data()[i]->border();
-						}
-						else
-							object::selected->border();
-					}
-					for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end(); ++it)
-						it->render();
 				}
 				else {
 					if (object::invalidate_all)
@@ -419,6 +407,8 @@ int main(void) {
 					for (int layer = 0; layer < 7; layer++)
 						for (int i = 0; i < res::objects.size(); i++)
 							res::objects.data()[i].render(layer);
+				}
+				if (!gui::menu) {
 					if (object::selected) {
 						if (object::selected->linked) {
 							for (int i = 0; i < object::selected->linked->members.size(); i++)
@@ -429,6 +419,20 @@ int main(void) {
 					}
 					for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end(); ++it)
 						it->render();
+					render_bars();
+					static const vec white(1.0f, 1.0f, 1.0f, 1.0f);
+					render_text(std::string("Time: ") + gui::time(game::time),
+						10, 9, 1260, 2, false, 0, white);
+					std::string fail_str = std::string("Fails: ") + std::to_string(game::failures);
+					render_text(fail_str, 1256 - 16 * (int)fail_str.length(),
+						9, 1260, 2, false, 0, white);
+					render_text(std::string("Level ") + std::to_string(game::level + 1) + std::string("/") + std::to_string(res::loader::levels.size()),
+						10, 689, 1260, 2, false, 0, white);
+					if (game::custom) {
+						std::string name_str = std::string("Map: ") + game::name;
+						render_text(name_str, 1256 - 16 * (int)name_str.length(),
+							689, 1260, 2, false, 0, white);
+					}
 				}
 				glfwSwapBuffers(gui::window);
 				skipped = 1;
@@ -531,9 +535,9 @@ void key_cb(GLFWwindow* window, int key, int scancode, int action, int mods) {
 	int step = 0;
 	if (object::selected) {
 		switch (object::selected->type) {
-		case object::enum_type::MIRROR:			step = 1;	break;
+		case object::enum_type::MIRROR:     	step = 1;	break;
 		case object::enum_type::GLASS_BLOCK:	step = 2;	break;
-		default:											break;
+		default: break;
 		}
 	}
 	if (key == keybinds::up || key == keybinds::left
@@ -570,13 +574,15 @@ void key_cb(GLFWwindow* window, int key, int scancode, int action, int mods) {
 			if (object::selected->linked) {
 				for (int i = 0; i < object::selected->linked->members.size(); i++) {
 					object* obj = object::selected->linked->members.data()[i];
-					obj->toggle = object::selected->toggle;
-					if (obj->type == object::enum_type::MOVING_WALL
-						|| obj->type == object::enum_type::MOVING_BLOCK
-						|| obj->type == object::enum_type::MOVING_CRYSTAL)
-						obj->moving = true;
-					else
-						object::invalidate_all = true;
+					if (!obj->moving) {
+						obj->toggle = object::selected->toggle;
+						if (obj->type == object::enum_type::MOVING_WALL
+							|| obj->type == object::enum_type::MOVING_BLOCK
+							|| obj->type == object::enum_type::MOVING_CRYSTAL)
+							obj->moving = true;
+						else
+							object::invalidate_all = true;
+					}
 				}
 			}
 			else {

@@ -1,36 +1,48 @@
-// Maybe using smart pointers would have been a good idea :)
-// Unfortunately I was too lazy to use them
-
 #include <algorithm>
 #include <cfloat>
-#include <cstdlib>
 
 #include <glad/glad.h>
 
 #include "head.hpp"
 
-const rect rect::background = { 0, 0, 640, 360, vec(0.08f, 0.08f, 0.08f, 1.0f), 5.0f };
-
 inline static GLint _round(double x) {
 	return (GLint)std::round(x);
 }
 
+void render_bars(void) {
+	for (int i = 0; i < 2; i++) {
+		glEnable(GL_SCISSOR_TEST);
+		glScissor(0, i * 680, 1280, 40);
+		glUniform4f(glGetUniformLocation(res::shaders::rectangle, "colour"), 0.0f, 0.0f, 0.0f, 1.0f);
+		glUniform1f(glGetUniformLocation(res::shaders::rectangle, "noise"), 0);
+		glUniform1f(glGetUniformLocation(res::shaders::rectangle, "pxsize"), (GLfloat)PX_SIZE);
+		glUseProgram(res::shaders::rectangle);
+		glBindVertexArray(res::rect_vao);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+		glBindVertexArray(0);
+		glDisable(GL_SCISSOR_TEST);
+	}
+}
+
 // object
+
+const vec object::default_colour(0.08f, 0.08f, 0.08f, 1.0f);
+const float object::default_noise = 5.0f;
 
 object::object(void) :
 	x(0), y(0), _x(0.0), _y(0.0), width(0), height(0),
 	x1(0), y1(0), x2(0), y2(0),
 	offset(0), toggle(false), moving(false), linked(NULL),
 	orientation(enum_orientation::NONE), type(enum_type::NONE),
-	texture(NULL), hitbox(NULL), data(0) {}
+	texture(NULL), hitbox(NULL), data(0), randomize(false) {}
 
 object::object(double x, double y, int width, int height, enum_orientation orientation, enum_type type,
-	std::vector<rect>* tex, std::vector<struct box>* hbox, int data) :
+	std::vector<rect>* tex, std::vector<box>* hbox, int data, bool randomize) :
 	x((int)x), y((int)y), _x(x), _y(y), width(width), height(height),
 	x1((int)x), y1((int)y), x2((int)x), y2((int)y),
-	offset(rand() / ((RAND_MAX + 1) / 256)), toggle(false), moving(false),
+	offset(mix32_rand(65536)), toggle(false), moving(false),
 	linked(NULL), orientation(orientation), type(type),
-	texture(tex), hitbox(hbox), data(data) {}
+	texture(tex), hitbox(hbox), data(data), randomize(randomize) {}
 
 object* object::selected = NULL;
 object* object::previous = NULL;
@@ -61,10 +73,10 @@ void object::render(int layer) const {
 	if (!texture) {
 		if (layer)
 			return;
-		const rect& quad = rect::background;
+		const rect& quad = res::loader::background();
 		glEnable(GL_SCISSOR_TEST);
 		glScissor(
-			(x + quad.x) * PX_SIZE, (y + quad.y) * PX_SIZE,
+			(x + quad.x) * PX_SIZE, 40 + (y + quad.y) * PX_SIZE,
 			quad.width * PX_SIZE, quad.height * PX_SIZE);
 		glUniform4fv(glGetUniformLocation(res::shaders::rectangle, "colour"),
 			1, quad.colour.ptr());
@@ -93,12 +105,12 @@ void object::render(int layer) const {
 			h += __y;
 			__y = 0;
 		}
-		if (w > 0 && h > 0 && x < 1280 && y < 720) {
-			glScissor(x * PX_SIZE, y * PX_SIZE, width * PX_SIZE, height * PX_SIZE);
+		if (w > 0 && h > 0 && x < 1280 && y < 640) {
+			glScissor(x * PX_SIZE, 40 + y * PX_SIZE, width * PX_SIZE, height * PX_SIZE);
 			glUniform4fv(glGetUniformLocation(res::shaders::rectangle, "colour"), 1,
-				rect::background.colour.ptr());
+				res::loader::background().colour.ptr());
 			glUniform1f(glGetUniformLocation(res::shaders::rectangle, "noise"),
-				rect::background.noise);
+				res::loader::background().noise);
 			glUniform1f(glGetUniformLocation(res::shaders::rectangle, "pxsize"), (GLfloat)PX_SIZE);
 			glUniform2f(glGetUniformLocation(res::shaders::rectangle, "offset"),
 				(GLfloat)res::objects.data()[0].offset,
@@ -115,20 +127,20 @@ void object::render(int layer) const {
 	switch (type) {
 	case enum_type::DOOR:
 	case enum_type::MIRROR_DOOR:
-		tex += (int)toggle;
+		tex += (uintptr_t)toggle;
 		break;
 	case enum_type::MIRROR:
-		tex += (int)orientation % 8;
+		tex += (uintptr_t)orientation % 8;
 		break;
 	case enum_type::DIAGONAL_MIRROR:
 	case enum_type::SPLITTER:
-		tex += ((int)orientation - 2) % 8 == 0 ? 0 : 1;
+		tex += (uintptr_t)(((int)orientation - 2) % 8 == 0 ? 0 : 1);
 		break;
 	case enum_type::GLASS_BLOCK:
-		tex += (int)orientation % 8 / 2;
+		tex += (uintptr_t)((int)orientation % 8 / 2);
 		break;
 	case enum_type::BOMB:
-		tex += (int)game::hardcore;
+		tex += (uintptr_t)game::hardcore;
 		break;
 	default:
 		break;
@@ -138,11 +150,11 @@ void object::render(int layer) const {
 		unsigned key = (unsigned short)width | ((unsigned short)height << 12) | ((unsigned char)type << 24);
 		if (type == enum_type::DOOR)
 			key |= (unsigned char)toggle << 31;
-		const static enum_type types[] = {
+		static const enum_type types[] = {
 			enum_type::WALL, enum_type::FIXED_BLOCK, enum_type::SPDC_CRYSTAL,
 			enum_type::MOVING_WALL, enum_type::MOVING_BLOCK, enum_type::MOVING_CRYSTAL
 		};
-		const static enum_type* end = types + sizeof(types) / sizeof(enum_type);
+		static const enum_type* end = types + sizeof(types) / sizeof(enum_type);
 		if ((it = object::temp_tex.find(key)) != object::temp_tex.end())
 			tex = &it->second;
 		else if (std::find(types, end, type) != end || (!toggle && type == enum_type::DOOR)) {
@@ -171,7 +183,7 @@ void object::render(int layer) const {
 			}
 		}
 		else if (type == enum_type::DOOR) {
-			const static vec colour = vec(0.3f, 0.35f, 0.38f, 0.5f);
+			static const vec colour = vec(0.3f, 0.35f, 0.38f, 0.5f);
 			tex = &object::temp_tex[key];
 			int __x = 1, __y = 0;
 			const int xmax = width - 2;
@@ -212,10 +224,10 @@ void object::render(int layer) const {
 			h += __y;
 			__y = 0;
 		}
-		if (w <= 0 || h <= 0 || __x > 1280 || __y > 720)
+		if (w <= 0 || h <= 0 || __x > 1280 || __y > 640)
 			continue;
 		glEnable(GL_SCISSOR_TEST);
-		glScissor(__x, __y, w, h);
+		glScissor(__x, 40 + __y, w, h);
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		if (type == enum_type::SENSOR && quad.colour == vec(0.3f, 0.9f, 0.6f, 1.0f)) {
@@ -271,7 +283,7 @@ void object::border(bool clear) const {
 	}
 	vec col = vec(1.0f, 1.0f, 1.0f, this == object::selected ? 0.6f : 0.3f);
 	if (clear)
-		col = rect::background.colour;
+		col = res::loader::background().colour;
 	for (int i = 0; i < r.size(); i++) {
 		GLint __x = r.data()[i].x;
 		GLint __y = r.data()[i].y;
@@ -285,15 +297,15 @@ void object::border(bool clear) const {
 			h += __y;
 			__y = 0;
 		}
-		if (w <= 0 || h <= 0 || __x > 1280 || __y > 720)
+		if (w <= 0 || h <= 0 || __x > 1280 || __y > 640)
 			continue;
 		glEnable(GL_SCISSOR_TEST);
-		glScissor(__x, __y, w, h);
+		glScissor(__x, 40 + __y, w, h);
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glUniform4fv(glGetUniformLocation(res::shaders::rectangle, "colour"), 1, col.ptr());
 		glUniform1f(glGetUniformLocation(res::shaders::rectangle, "noise"),
-			clear ? rect::background.noise : 0.0f);
+			clear ? res::loader::background().noise : 0.0f);
 		glUniform1f(glGetUniformLocation(res::shaders::rectangle, "pxsize"), (GLfloat)PX_SIZE);
 		glUniform2f(glGetUniformLocation(res::shaders::rectangle, "offset"),
 			(GLfloat)res::objects.data()[0].offset, (GLfloat)res::objects.data()[0].offset);
@@ -355,7 +367,7 @@ void group::add(object* obj) {
 // photon
 
 photon::photon(std::vector<rect>* tex, double x, double y, enum_direction dir, int dc, int split, node* parent) :
-	object(x, y, 4, 4, enum_orientation::NONE, enum_type::NONE, NULL, NULL, 0),
+	object(x, y, 4, 4, enum_orientation::NONE, enum_type::NONE, NULL, NULL, 0, false),
 	_tick(0.0), medium(NULL), direction(dir), dc(dc), split(split), parent(parent),
 	interacting(NULL), i_hbox(), i_line(0) {
 	texture = tex;
@@ -385,10 +397,10 @@ void photon::render(void) const {
 			h += __y;
 			__y = 0;
 		}
-		if ((GLsizei)w <= 0 || (GLsizei)h <= 0 || _round(__x) > 1280 || _round(__y) > 720)
+		if ((GLsizei)w <= 0 || (GLsizei)h <= 0 || _round(__x) > 1280 || _round(__y) > 640)
 			continue;
 		glEnable(GL_SCISSOR_TEST);
-		glScissor(_round(__x), _round(__y), (GLsizei)w, (GLsizei)h);
+		glScissor(_round(__x), 40 + _round(__y), (GLsizei)w, (GLsizei)h);
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glUniform4fv(glGetUniformLocation(res::shaders::rectangle, "colour"),
@@ -418,7 +430,7 @@ void photon::pre_tick(int tps) {
 			continue;
 		const object& tmp = res::objects.data()[i];
 		if (tmp.hitbox == NULL) {
-			box hbox = {
+			const box hbox = {
 				{-0.5, -0.5, tmp.width + 0.5, tmp.width + 0.5},
 				{-0.5, tmp.height + 0.5, tmp.height + 0.5, -0.5}
 			};

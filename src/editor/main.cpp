@@ -66,6 +66,7 @@
 namespace fs = std::filesystem;
 
 void key_cb(GLFWwindow* window, int key, int scancode, int action, int mods);
+bool save_to_file(std::string path);
 
 static bool command = false;
 long long game::frame = -1;
@@ -81,7 +82,7 @@ int main(void) {
 #else
 		std::cout << "Failed to initialize GLFW" << std::endl;
 #endif // _WIN32
-		exit(EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -95,7 +96,7 @@ int main(void) {
 #else
 		std::cout << "Failed to create window" << std::endl;
 #endif // _WIN32
-		exit(EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 	glfwMakeContextCurrent(window);
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
@@ -106,7 +107,7 @@ int main(void) {
 #else
 		std::cout << "Failed to load glad" << std::endl;
 #endif // _WIN32
-		exit(EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 	glViewport(0, 0, 1280, 720);
 	if (fs::is_regular_file(fs::path("./settings"))) {
@@ -124,11 +125,14 @@ int main(void) {
 	double next = glfwGetTime();
 	int skipped = 1;
 	constexpr std::chrono::seconds zero(0);
+	constexpr std::chrono::seconds one(1);
 	int tps = 64;
 	std::cout << "Type `help` for a list of commands." << std::endl;
 	glClear(GL_COLOR_BUFFER_BIT);
 	glfwSwapBuffers(window);
 	bool unsaved = false;
+	bool first = true;
+	bool randomize = true;
 	while (!glfwWindowShouldClose(window)) {
 		command = false;
 		bool preview = false;
@@ -143,37 +147,47 @@ int main(void) {
 			std::vector<object>* current = &res::loader::levels.data()[game::level].objects;
 			if (cmd.empty())
 				continue;
-			const static object::enum_type toggleable[] = {
+			static constexpr object::enum_type toggleable[] = {
 				object::enum_type::DOOR, object::enum_type::MIRROR_DOOR,
 				object::enum_type::MOVING_WALL, object::enum_type::MOVING_BLOCK, object::enum_type::MOVING_CRYSTAL
 			};
-			const static object::enum_type* end = toggleable + sizeof(toggleable) / sizeof(object::enum_type);
+			static const object::enum_type* end = toggleable + sizeof(toggleable) / sizeof(object::enum_type);
 			if (cmd == "help") {
-				std::cout << "All parameters in [square brackets] are integers. All parameters in (parentheses) are strings.\n";
+				std::cout << "All parameters in [square brackets] are integers.\nAll parameters in (parentheses) are strings.\nAll parameters in {curly braces} are floating-point (decimal) numbers.\n";
 				std::cout << "List of commands:\n";
 				std::cout << "help          - Displays this list.\n";
 				std::cout << "cheatsheet    - Displays the numerical values of directions, orientations, and object types.\n";
 				std::cout << "load (path)   - Loads a level from a file for editing.\n";
 				std::cout << "import (path) - Loads a level from a file for editing.\n";
 				std::cout << "export (path) - Exports the level to a file. You can export the default level to see what the file is like.\n";
-				std::cout << "save          - Like `export`, but does not warn before overwriting. Must have used `load`/`export` first.\n";
+				std::cout << "save          - Like `export`, but does not warn before overwriting. Must have used `load`/`import`/`export` first.\n";
+				std::cout << "name (str)    - Sets the name of the map to (str).\n";
 				std::cout << "levels        - Lists all levels as well as their object counts.\n";
 				std::cout << "level [n]     - Selects the [n]th level. If this level does not exist, it will be created.\n";
 				std::cout << "remove [n]    - Removes the [n]th level.\n";
-				std::cout << "random [bool] - If set to 1, the orientation of rotatable objects is randomized at the beginning of every attempt.\n";
-				std::cout << "                If set to 0, the orientation is not randomized. The default value is 1.\n";
 				std::cout << "text (str)    - Sets the text to be displayed before loading the selected level to (str).\n";
 				std::cout << "rmtext        - Removes the text displayed before the selected level.\n";
+				std::cout << "background {r} {g} {b} {noise}\n";
+				std::cout << "              - Sets the background colour with RGB value ({r}, {g}, {b}) (default: (0.08, 0.08, 0.08))\n";
+				std::cout << "                and noise level {noise} (default: 5). {r}, {g}, {b} are all bound by [0, 1].\n";
 				std::cout << "list          - Lists all objects in the selected level.\n";
 				std::cout << "add [type] [x] [y] [o]\n";
 				std::cout << "              - Places an object of type [type] at ([x], [y]) with orientation [o]. See `cheatsheet`.\n";
 				std::cout << "move [id] [x] [y] [o]\n";
 				std::cout << "              - Moves the object specified by [id] to coordinates ([x], [y]) and orientation [o].\n";
+				std::cout << "random [id] [bool]\n";
+				std::cout << "              - If set to 1, the orientation (if rotatable) or state (if toggleable, not movable, and not linked\n";
+				std::cout << "                to any other object) of the object with id [id] is randomized at the beginning of every attempt.\n";
+				std::cout << "                If set to 0, the orientation is not randomized. The default value is 1 for applicable objects.\n";
 				std::cout << "inspect [id]  - Diplays information on the object specified by [id]. Use `list` for a list of IDs.\n";
 				std::cout << "delete [id]   - Removes the object specified by [id]. Use `list` for a list of IDs.\n";
 				std::cout << "clear         - Removes all objects in the selected level.\n";
 				std::cout << "spawn [x] [y] [dir]\n";
-				std::cout << "              - Sets the spawn position of the photon to([x], [y]) with initial direction [dir]. See `cheatsheet`.\n";
+				std::cout << "              - Sets the initial position of the photon to ([x], [y]) with initial direction [dir]. See `cheatsheet`.\n";
+				std::cout << "randomize [bool]\n";
+				std::cout << "              - If set to 1, newly created applicable objects (see the `random` command) will have their orientation\n";
+				std::cout << "                randomized at the beginning of each attempt by default. If set to 0, their orientations will not be\n";
+				std::cout << "                randomized by default. The default value is 1. The setting is not saved when the editor is closed.\n";
 				std::cout << "preview       - Renders the selected level.\n";
 				std::cout << "play          - Plays the selected level.\n";
 				std::cout << "credits       - Displays credits.\n";
@@ -181,33 +195,33 @@ int main(void) {
 				std::cout << "exit          - Exits the editor." << std::endl;
 			}
 			else if (cmd == "cheatsheet") {
-				std::cout << "Directions     | Orientationss | Types\n";
-				std::cout << "---------------+---------------+--------------------\n";
-				std::cout << "E         = 0  | N    = 0      | WALL            = 0\n";
-				std::cout << "E_ATAN1_3 = 1  | NNW  = 1      | DOOR            = 1\n";
-				std::cout << "E_ATAN1_2 = 2  | NW   = 2      | MOVING_WALL     = 2\n";
-				std::cout << "NE        = 3  | NWW  = 3      | MIRROR          = 3\n";
-				std::cout << "E_ATAN2   = 4  | W    = 4      | DIAGONAL_MIRROR = 4\n";
-				std::cout << "E_ATAN3   = 5  | SWW  = 5      | MIRROR_BLOCK    = 5\n";
-				std::cout << "N         = 6  | SW   = 6      | MIRROR_DOOR     = 6\n";
-				std::cout << "N_ATAN1_3 = 7  | SSW  = 7      | GLASS_BLOCK     = 7\n";
-				std::cout << "N_ATAN1_2 = 8  | S    = 8      | FIXED_BLOCK     = 8\n";
-				std::cout << "NW        = 9  | SSE  = 9      | MOVING_BLOCK    = 9\n";
-				std::cout << "N_ATAN2   = 10 | SE   = 10     | PRISM           = 10\n";
-				std::cout << "N_ATAN3   = 11 | SEE  = 11     | SPDC_CRYSTAL    = 11\n";
-				std::cout << "W         = 12 | E    = 12     | MOVING_CRYSTAL  = 12\n";
-				std::cout << "W_ATAN1_3 = 13 | NEE  = 13     | SPLITTER        = 13\n";
-				std::cout << "W_ATAN1_2 = 14 | NE   = 14     | BOMB            = 14\n";
-				std::cout << "SW        = 15 | NNE  = 15     | SENSOR          = 15\n";
-				std::cout << "W_ATAN2   = 16 | NONE = 16     | NONE            = 16\n";
-				std::cout << "W_ATAN3   = 17 |               |\n";
-				std::cout << "S         = 18 |               |\n";
-				std::cout << "S_ATAN1_3 = 19 |               |\n";
-				std::cout << "S_ATAN1_2 = 20 |               |\n";
-				std::cout << "SW        = 21 |               |\n";
-				std::cout << "S_ATAN2   = 22 |               |\n";
-				std::cout << "S_ATAN3   = 23 |               |\n";
-				std::cout << "NONE      = 24 |               |" << std::endl;
+				std::cout << " Directions          | Orientations        | Types\n";
+				std::cout << "---------------------+---------------------+---------------------\n";
+				std::cout << " E         = 0       | N    = 0            | WALL            = 0\n";
+				std::cout << " E_ATAN1_3 = 1       | NNW  = 1            | DOOR            = 1\n";
+				std::cout << " E_ATAN1_2 = 2       | NW   = 2            | MOVING_WALL     = 2\n";
+				std::cout << " NE        = 3       | NWW  = 3            | MIRROR          = 3\n";
+				std::cout << " E_ATAN2   = 4       | W    = 4            | DIAGONAL_MIRROR = 4\n";
+				std::cout << " E_ATAN3   = 5       | SWW  = 5            | MIRROR_BLOCK    = 5\n";
+				std::cout << " N         = 6       | SW   = 6            | MIRROR_DOOR     = 6\n";
+				std::cout << " N_ATAN1_3 = 7       | SSW  = 7            | GLASS_BLOCK     = 7\n";
+				std::cout << " N_ATAN1_2 = 8       | S    = 8            | FIXED_BLOCK     = 8\n";
+				std::cout << " NW        = 9       | SSE  = 9            | MOVING_BLOCK    = 9\n";
+				std::cout << " N_ATAN2   = 10      | SE   = 10           | PRISM           = 10\n";
+				std::cout << " N_ATAN3   = 11      | SEE  = 11           | SPDC_CRYSTAL    = 11\n";
+				std::cout << " W         = 12      | E    = 12           | MOVING_CRYSTAL  = 12\n";
+				std::cout << " W_ATAN1_3 = 13      | NEE  = 13           | SPLITTER        = 13\n";
+				std::cout << " W_ATAN1_2 = 14      | NE   = 14           | BOMB            = 14\n";
+				std::cout << " SW        = 15      | NNE  = 15           | SENSOR          = 15\n";
+				std::cout << " W_ATAN2   = 16      | NONE = 16           | NONE            = 16\n";
+				std::cout << " W_ATAN3   = 17      |                     |\n";
+				std::cout << " S         = 18      |                     |\n";
+				std::cout << " S_ATAN1_3 = 19      |                     |\n";
+				std::cout << " S_ATAN1_2 = 20      |                     |\n";
+				std::cout << " SW        = 21      |                     |\n";
+				std::cout << " S_ATAN2   = 22      |                     |\n";
+				std::cout << " S_ATAN3   = 23      |                     |\n";
+				std::cout << " NONE      = 24      |                     |" << std::endl;
 			}
 			else if (cmd == "load" || cmd == "import") {
 				if (unsaved) {
@@ -224,43 +238,22 @@ int main(void) {
 							std::cout << "Enter a filename: ";
 							std::getline(std::cin, game::save);
 						}
-						std::ofstream out(game::save, std::ios::trunc);
-						for (int i = 0; i < res::loader::levels.size(); i++) {
-							out << ' ' << res::loader::levels.data()[i].hint << '\n';
-							const object& p = res::loader::levels.data()[i].objects.data()[0];
-							out << res::loader::levels.data()[i].randomize << ' '
-								<< p.x << ' ' << p.y << ' ' << p.data << '\n';
-							for (int j = 2; j < res::loader::levels.data()[i].objects.size(); j++) {
-								const object& obj = res::loader::levels.data()[i].objects.data()[j];
-								out << (int)obj.type << ' ' << obj.x << ' ' << obj.y << ' ' << (int)obj.orientation;
-								if (obj.type == object::enum_type::MOVING_WALL
-									|| obj.type == object::enum_type::MOVING_BLOCK
-									|| obj.type == object::enum_type::MOVING_CRYSTAL)
-									out << ' ' << obj.x2 << ' ' << obj.y2 << ' ' << obj.data;
-								else if (obj.type == object::enum_type::DOOR || obj.type == object::enum_type::MIRROR_DOOR)
-									out << ' ' << obj.data;
-								out << '\n';
-							}
-						}
-						std::flush(out);
-						if (out.fail()) {
+						if (!save_to_file(game::save)) {
 							std::cout << "Something went wrong while writing to the file." << std::endl;
-							out.close();
 							continue;
 						}
-						out.close();
-						unsaved = false;
+						else
+							unsaved = false;
 					}
 				}
 				std::string path;
 				std::getline(std::cin, path);
 				path = path.substr(1);
 				if (fs::is_regular_file(path)) {
-					if (!res::loader::load_from_file(path)) {
+					if (!res::loader::load_from_file(path))
 						std::cout << "Failed to read level file" << std::endl;
-						res::loader::load_default();
-					}
-					game::save = path;
+					else
+						game::save = path;
 				}
 				else
 					std::cout << "File not found" << std::endl;
@@ -281,68 +274,34 @@ int main(void) {
 						continue;
 				}
 				game::save = path;
-				std::ofstream out(path, std::ios::trunc);
-				for (int i = 0; i < res::loader::levels.size(); i++) {
-					out << ' ' << res::loader::levels.data()[i].hint << '\n';
-					const object& p = res::loader::levels.data()[i].objects.data()[0];
-					out << res::loader::levels.data()[i].randomize << ' '
-						<< p.x << ' ' << p.y << ' ' << p.data << '\n';
-					for (int j = 2; j < res::loader::levels.data()[i].objects.size(); j++) {
-						const object& obj = res::loader::levels.data()[i].objects.data()[j];
-						out << (int)obj.type << ' ' << obj.x << ' ' << obj.y << ' ' << (int)obj.orientation;
-						if (obj.type == object::enum_type::MOVING_WALL
-							|| obj.type == object::enum_type::MOVING_BLOCK
-							|| obj.type == object::enum_type::MOVING_CRYSTAL)
-							out << ' ' << obj.x2 << ' ' << obj.y2 << ' ' << obj.data;
-						else if (obj.type == object::enum_type::DOOR || obj.type == object::enum_type::MIRROR_DOOR)
-							out << ' ' << obj.data;
-						out << '\n';
-					}
-				}
-				std::flush(out);
-				if (out.fail())
+				if (!save_to_file(game::save))
 					std::cout << "Something went wrong while writing to the file." << std::endl;
 				else
 					unsaved = false;
-				out.close();
 			}
 			else if (cmd == "save") {
 				if (game::save.empty()) {
 					std::cout << "No level file loaded. Try `export`." << std::endl;
 					continue;
 				}
-				std::ofstream out(game::save, std::ios::trunc);
-				for (int i = 0; i < res::loader::levels.size(); i++) {
-					out << ' ' << res::loader::levels.data()[i].hint << '\n';
-					const object& p = res::loader::levels.data()[i].objects.data()[0];
-					out << res::loader::levels.data()[i].randomize << ' '
-						<< p.x << ' ' << p.y << ' ' << p.data << '\n';
-					for (int j = 2; j < res::loader::levels.data()[i].objects.size(); j++) {
-						const object& obj = res::loader::levels.data()[i].objects.data()[j];
-						out << (int)obj.type << ' ' << obj.x << ' ' << obj.y << ' ' << (int)obj.orientation;
-						if (obj.type == object::enum_type::MOVING_WALL
-							|| obj.type == object::enum_type::MOVING_BLOCK
-							|| obj.type == object::enum_type::MOVING_CRYSTAL)
-							out << ' ' << obj.x2 << ' ' << obj.y2 << ' ' << obj.data;
-						else if (obj.type == object::enum_type::DOOR || obj.type == object::enum_type::MIRROR_DOOR)
-							out << ' ' << obj.data;
-						out << '\n';
-					}
-				}
-				std::flush(out);
-				if (out.fail())
+				if (!save_to_file(game::save))
 					std::cout << "Something went wrong while writing to the file." << std::endl;
 				else
 					unsaved = false;
-				out.close();
 			}
-			else if (cmd == "levels")
+			else if (cmd == "name") {
+				std::string name;
+				std::getline(std::cin, name);
+				game::name = name.substr(1);
+			}
+			else if (cmd == "levels") {
+				std::cout << game::name << '\n';
 				for (int i = 0; i < res::loader::levels.size(); i++)
 					std::cout << "Level " << i + 1 << " - "
 						<< res::loader::levels.data()[i].objects.size() - 2
-						<< " object" << (res::loader::levels.data()[i].objects.size() == 3 ? "" : "s") << "; "
-						<< "orientation of objects" << (res::loader::levels.data()[i].randomize ? " " : " not ")
-						<< "randomized\n\"" << res::loader::levels.data()[i].hint << "\"" << std::endl;
+						<< " object" << (res::loader::levels.data()[i].objects.size() == 3 ? "" : "s") << "; \""
+						<< res::loader::levels.data()[i].hint << "\"" << std::endl;
+			}
 			else if (cmd == "level") {
 				std::string _n;
 				std::cin >> _n;
@@ -366,9 +325,12 @@ int main(void) {
 					res::loader::levels.push_back(res::loader::level());
 					res::loader::levels.back().objects.push_back(object(0.0, 0.0, 1, 1,
 						object::enum_orientation::NONE, object::enum_type::NONE, TEX_PHOTON, NULL,
-						(int)photon::enum_direction::E));
+						(int)photon::enum_direction::E, false));
 					res::loader::levels.back().objects.push_back(object(0.0, 0.0, 640, 360,
-						object::enum_orientation::NONE, object::enum_type::NONE, NULL, NULL, 0));
+						object::enum_orientation::NONE, object::enum_type::NONE, NULL, NULL, 0, false));
+					res::loader::set_background((int)(res::loader::levels.size() - 1),
+						res::loader::levels.size() - 1 ? res::loader::background().colour : object::default_colour,
+						res::loader::levels.size() - 1 ? res::loader::background().noise : object::default_noise);
 					unsaved = true;
 				}
 				if ((size_t)(n - 1) <= res::loader::levels.size())
@@ -390,7 +352,7 @@ int main(void) {
 					std::getline(std::cin, s);
 					continue;
 				}
-				if (n < 1) {
+				if (n < 1 || n > res::loader::levels.size()) {
 					std::cout << "Invalid input" << std::endl;
 					std::string s;
 					std::getline(std::cin, s);
@@ -412,7 +374,7 @@ int main(void) {
 					res::loader::levels.erase(res::loader::levels.begin() + (n - 1));
 				unsaved = true;
 			}
-			else if (cmd == "random") {
+			else if (cmd == "randomize") {
 				std::string _r;
 				std::cin >> _r;
 				bool r;
@@ -425,8 +387,7 @@ int main(void) {
 					std::getline(std::cin, s);
 					continue;
 				}
-				res::loader::levels.data()[game::level].randomize = r;
-				unsaved = true;
+				randomize = r;
 			}
 			else if (cmd == "text") {
 				std::string text;
@@ -436,6 +397,31 @@ int main(void) {
 			}
 			else if (cmd == "rmtext") {
 				res::loader::levels.data()[game::level].hint.clear();
+				unsaved = true;
+			}
+			else if (cmd == "background") {
+				std::string _r, _g, _b, _noise;
+				std::cin >> _r >> _g >> _b >> _noise;
+				float r, g, b, noise;
+				try {
+					r = std::stof(_r);
+					g = std::stof(_g);
+					b = std::stof(_b);
+					noise = std::stof(_noise);
+				}
+				catch (...) {
+					std::cout << "Invalid input" << std::endl;
+					std::string s;
+					std::getline(std::cin, s);
+					continue;
+				}
+				if (r < 0.0f || r > 1.0f || g < 0.0f || g > 1.0f || b < 0.0f || b > 1.0f || noise < 0.0f) {
+					std::cout << "Invalid input" << std::endl;
+					std::string s;
+					std::getline(std::cin, s);
+					continue;
+				}
+				res::loader::set_background(game::level, vec(r, g, b, 1.0f), noise);
 				unsaved = true;
 			}
 			else if (cmd == "list") {
@@ -473,7 +459,7 @@ int main(void) {
 				object::enum_type t = (object::enum_type)type;
 				current->push_back(object(x, y, 20, 20,
 					(object::enum_orientation)o, t,
-					res::loader::get_tex(t), res::loader::get_hbx(t), 0));
+					res::loader::get_tex(t), res::loader::get_hbx(t), 0, false));
 				if (std::find(toggleable, end, t) != end) {
 					int x2, y2, link;
 					if (t == object::enum_type::MOVING_WALL
@@ -523,6 +509,9 @@ int main(void) {
 					}
 					current->back().data = link;
 				}
+				current->back().randomize = randomize
+					&& (current->back().type == object::enum_type::MIRROR || current->back().type == object::enum_type::GLASS_BLOCK
+						|| (!current->back().data && std::find(toggleable, end, current->back().type) != end));
 				unsaved = true;
 			}
 			else if (cmd == "move") {
@@ -556,6 +545,39 @@ int main(void) {
 				current->data()[id].orientation = (object::enum_orientation)o;
 				unsaved = true;
 			}
+			else if (cmd == "random") {
+				std::string _id, _r;
+				std::cin >> _id >> _r;
+				int id;
+				bool r;
+				try {
+					id = std::stoi(_id);
+					r = std::stoi(_r) != 0;
+				}
+				catch (...) {
+					std::cout << "Invalid input" << std::endl;
+					std::string s;
+					std::getline(std::cin, s);
+					continue;
+				}
+				id += 2;
+				if (id < 2 || id >= current->size()) {
+					std::cout << "ID out of range" << std::endl;
+					std::string s;
+					std::getline(std::cin, s);
+					continue;
+				}
+				object& obj = current->data()[id];
+				if (r) {
+					if ((obj.type == object::enum_type::MIRROR || obj.type == object::enum_type::GLASS_BLOCK
+						|| (!obj.data && std::find(toggleable, end, obj.type) != end)))
+						obj.randomize = true;
+					else
+						std::cout << "`random` is not applicable to this object." << std::endl;
+				}
+				else
+					obj.randomize = false;
+			}
 			else if (cmd == "inspect") {
 				std::string _id;
 				std::cin >> _id;
@@ -571,16 +593,18 @@ int main(void) {
 				}
 				id += 2;
 				if (id < 2 || id >= current->size()) {
-					std::cout << "Invalid input" << std::endl;
+					std::cout << "ID out of range" << std::endl;
 					std::string s;
 					std::getline(std::cin, s);
 					continue;
 				}
-				std::cout << "type=" << (int)current->data()[id].type
-					<< ", x=" << current->data()[id].x << ", y=" << current->data()[id].y
-					<< ", orientation=" << (int)current->data()[id].orientation
-					<< ", otherx=" << current->data()[id].x2 << ", othery=" << current->data()[id].y2
-					<< ", number=" << current->data()[id].data << std::endl;
+				const object& obj = current->data()[id];
+				std::cout << "type=" << (int)obj.type
+					<< ", x=" << obj.x << ", y=" << obj.y
+					<< ", orientation=" << (int)obj.orientation
+					<< ", otherx=" << obj.x2 << ", othery=" << obj.y2
+					<< ", number=" << obj.data
+					<< ", randomize=" << (int)obj.randomize << std::endl;
 			}
 			else if (cmd == "delete") {
 				std::string _id;
@@ -596,7 +620,7 @@ int main(void) {
 					continue;
 				}
 				if (id < 0 || id >= current->size() - 2) {
-					std::cout << "Invalid input" << std::endl;
+					std::cout << "ID out of range" << std::endl;
 					std::string s;
 					std::getline(std::cin, s);
 					continue;
@@ -616,9 +640,9 @@ int main(void) {
 					current->clear();
 					current->push_back(object(0.0, 0.0, 1, 1,
 						object::enum_orientation::NONE, object::enum_type::NONE, TEX_PHOTON, NULL,
-						(int)photon::enum_direction::E));
+						(int)photon::enum_direction::E, false));
 					current->push_back(object(0.0, 0.0, 640, 360,
-						object::enum_orientation::NONE, object::enum_type::NONE, NULL, NULL, 0));
+						object::enum_orientation::NONE, object::enum_type::NONE, NULL, NULL, 0, false));
 				}
 				unsaved = true;
 			}
@@ -656,6 +680,11 @@ int main(void) {
 			}
 			else if (cmd == "play") {
 				std::cout << "Press ESC to return to the console." << std::endl;
+				if (first) {
+					first = false;
+					std::this_thread::sleep_for(one);
+					// Sleep so that the user has time to read the prompt
+				}
 				res::loader::load_level(game::level, false);
 				glfwFocusWindow(window);
 				break;
@@ -663,7 +692,7 @@ int main(void) {
 			else if (cmd == "credits") {
 				std::cout << "This game uses the following libraries:\n";
 				std::cout << "GLFW: Copyright (c) 2002-2006 Marcus Geelnard, (c) 2006-2019 Camilla Löwy; licensed under the zlib License\n";
-				std::cout << "glad: Copyright (c) 2013-2022 David Herberth; in the public domain" << std::endl;
+				std::cout << "glad: Created by David Herberth; in the public domain" << std::endl;
 			}
 			else if (cmd == "quit" || cmd == "exit") {
 				if (unsaved) {
@@ -680,36 +709,15 @@ int main(void) {
 							std::cout << "Enter a filename: ";
 							std::getline(std::cin, game::save);
 						}
-						std::ofstream out(game::save, std::ios::trunc);
-						for (int i = 0; i < res::loader::levels.size(); i++) {
-							out << ' ' << res::loader::levels.data()[i].hint << '\n';
-							const object& p = res::loader::levels.data()[i].objects.data()[0];
-							out << res::loader::levels.data()[i].randomize << ' '
-								<< p.x << ' ' << p.y << ' ' << p.data << '\n';
-							for (int j = 2; j < res::loader::levels.data()[i].objects.size(); j++) {
-								const object& obj = res::loader::levels.data()[i].objects.data()[j];
-								out << (int)obj.type << ' ' << obj.x << ' ' << obj.y << ' ' << (int)obj.orientation;
-								if (obj.type == object::enum_type::MOVING_WALL
-									|| obj.type == object::enum_type::MOVING_BLOCK
-									|| obj.type == object::enum_type::MOVING_CRYSTAL)
-									out << ' ' << obj.x2 << ' ' << obj.y2 << ' ' << obj.data;
-								else if (obj.type == object::enum_type::DOOR || obj.type == object::enum_type::MIRROR_DOOR)
-									out << ' ' << obj.data;
-								out << '\n';
-							}
-						}
-						std::flush(out);
-						if (out.fail()) {
+						if (!save_to_file(game::save)) {
 							std::cout << "Something went wrong while writing to the file." << std::endl;
-							out.close();
 							continue;
 						}
-						out.close();
 					}
 				}
 				glfwDestroyWindow(window);
 				glfwTerminate();
-				exit(EXIT_SUCCESS);
+				return EXIT_SUCCESS;
 			}
 			else {
 				std::cout << "Unrecognized command" << std::endl;
@@ -785,12 +793,12 @@ int main(void) {
 						for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end(); ++it) {
 							glEnable(GL_SCISSOR_TEST);
 							glScissor(
-								(GLint)std::round(it->_x - 480.0 / tps) * PX_SIZE, (GLint)std::round(it->_y - 480.0 / tps) * PX_SIZE,
+								(GLint)std::round(it->_x - 480.0 / tps) * PX_SIZE, 40 + (GLint)std::round(it->_y - 480.0 / tps) * PX_SIZE,
 								(GLsizei)(PX_SIZE * 960.0 / tps), (GLsizei)(PX_SIZE * 960.0 / tps));
 							glUniform4fv(glGetUniformLocation(res::shaders::rectangle, "colour"),
-								1, rect::background.colour.ptr());
+								1, res::loader::background().colour.ptr());
 							glUniform1f(glGetUniformLocation(res::shaders::rectangle, "noise"),
-								rect::background.noise);
+								res::loader::background().noise);
 							glUniform1f(glGetUniformLocation(res::shaders::rectangle, "pxsize"), (GLfloat)PX_SIZE);
 							glUniform2f(glGetUniformLocation(res::shaders::rectangle, "offset"),
 								(GLfloat)res::objects.data()[0].offset,
@@ -811,14 +819,14 @@ int main(void) {
 						}
 						for (int i = 1; i < res::objects.size(); i++) {
 							object& obj = res::objects.data()[i];
-							const static object::enum_type translucent[] = {
+							static constexpr object::enum_type translucent[] = {
 								object::enum_type::DIAGONAL_MIRROR,
 								object::enum_type::GLASS_BLOCK, object::enum_type::FIXED_BLOCK,
 								object::enum_type::MOVING_BLOCK, object::enum_type::PRISM,
 								object::enum_type::SPDC_CRYSTAL, object::enum_type::MOVING_CRYSTAL,
 								object::enum_type::SPLITTER
 							};
-							const static object::enum_type* end = translucent + sizeof(translucent) / sizeof(object::enum_type);
+							static const object::enum_type* end = translucent + sizeof(translucent) / sizeof(object::enum_type);
 							if (std::find(translucent, end, obj.type) != end || (obj.toggle && (obj.type == object::enum_type::DOOR || obj.type == object::enum_type::MIRROR_DOOR)))
 								object::invalidated.insert(&obj);
 							else if ((obj.type == object::enum_type::DOOR || obj.type == object::enum_type::MIRROR_DOOR) && obj.toggle)
@@ -871,16 +879,6 @@ int main(void) {
 								(*it)->render(layer);
 						if (game::frame % 2)
 							object::invalidated.clear();
-						if (object::selected) {
-							if (object::selected->linked) {
-								for (int i = 0; i < object::selected->linked->members.size(); i++)
-									object::selected->linked->members.data()[i]->border();
-							}
-							else
-								object::selected->border();
-						}
-						for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end(); ++it)
-							it->render();
 					}
 					else {
 						if (object::invalidate_all)
@@ -891,17 +889,18 @@ int main(void) {
 						for (int layer = 0; layer < 7; layer++)
 							for (int i = 0; i < res::objects.size(); i++)
 								res::objects.data()[i].render(layer);
-						if (object::selected) {
-							if (object::selected->linked) {
-								for (int i = 0; i < object::selected->linked->members.size(); i++)
-									object::selected->linked->members.data()[i]->border();
-							}
-							else
-								object::selected->border();
-						}
-						for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end(); ++it)
-							it->render();
 					}
+					if (object::selected) {
+						if (object::selected->linked) {
+							for (int i = 0; i < object::selected->linked->members.size(); i++)
+								object::selected->linked->members.data()[i]->border();
+						}
+						else
+							object::selected->border();
+					}
+					for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end(); ++it)
+						it->render();
+					render_bars();
 					glfwSwapBuffers(window);
 					skipped = 1;
 				}
@@ -926,24 +925,28 @@ void key_cb(GLFWwindow* window, int key, int scancode, int action, int mods) {
 	int step = 0;
 	if (object::selected) {
 		switch (object::selected->type) {
-		case object::enum_type::MIRROR:			step = 1;	break;
+		case object::enum_type::MIRROR:     	step = 1;	break;
 		case object::enum_type::GLASS_BLOCK:	step = 2;	break;
-		default:											break;
+		default: break;
 		}
 	}
 	if (key == keybinds::up || key == keybinds::left
-		|| key == keybinds::down || key == keybinds::right)
+		|| key == keybinds::down || key == keybinds::right) {
 		select(key);
+		object::invalidate_all = true;
+	}
 	else if (key == keybinds::ccw) {
 		if (object::selected) {
 			int dir = (int)object::selected->orientation;
 			object::selected->orientation = (object::enum_orientation)(dir == 16 - step ? 0 : dir + step);
+			object::invalidate_all = true;
 		}
 	}
 	else if (key == keybinds::cw) {
 		if (object::selected) {
 			int dir = (int)object::selected->orientation;
 			object::selected->orientation = (object::enum_orientation)(dir == 0 ? 16 - step : dir - step);
+			object::invalidate_all = true;
 		}
 	}
 	else if (key == keybinds::perp) {
@@ -952,6 +955,7 @@ void key_cb(GLFWwindow* window, int key, int scancode, int action, int mods) {
 			if (dir > 15)
 				dir -= 16;
 			object::selected->orientation = (object::enum_orientation)dir;
+			object::invalidate_all = true;
 		}
 	}
 	else if (key == keybinds::toggle) {
@@ -960,11 +964,15 @@ void key_cb(GLFWwindow* window, int key, int scancode, int action, int mods) {
 			if (object::selected->linked) {
 				for (int i = 0; i < object::selected->linked->members.size(); i++) {
 					object* obj = object::selected->linked->members.data()[i];
-					obj->toggle = object::selected->toggle;
-					if (obj->type == object::enum_type::MOVING_WALL
-						|| obj->type == object::enum_type::MOVING_BLOCK
-						|| obj->type == object::enum_type::MOVING_CRYSTAL)
-						obj->moving = true;
+					if (!obj->moving) {
+						obj->toggle = object::selected->toggle;
+						if (obj->type == object::enum_type::MOVING_WALL
+							|| obj->type == object::enum_type::MOVING_BLOCK
+							|| obj->type == object::enum_type::MOVING_CRYSTAL)
+							obj->moving = true;
+						else
+							object::invalidate_all = true;
+					}
 				}
 			}
 			else {
@@ -972,11 +980,41 @@ void key_cb(GLFWwindow* window, int key, int scancode, int action, int mods) {
 					|| object::selected->type == object::enum_type::MOVING_BLOCK
 					|| object::selected->type == object::enum_type::MOVING_CRYSTAL)
 					object::selected->moving = true;
+				else
+					object::invalidate_all = true;
 			}
 		}
 	}
 	else if (key == GLFW_KEY_ESCAPE)
 		command = true;
+}
+
+bool save_to_file(std::string path) {
+	std::ofstream out(path, std::ios::trunc);
+	out << game::name << '\n';
+	for (int i = 0; i < res::loader::levels.size(); i++) {
+		out << ' ' << res::loader::levels.data()[i].hint << '\n';
+		const object& p = res::loader::levels.data()[i].objects.data()[0];
+		const rect& background = res::loader::background(i);
+		out << p.x << ' ' << p.y << ' ' << p.data << ' '
+			<< p.x1 << ' ' << p.x2 << ' ' << p.y1 << ' ' << p.y2 << '\n';
+		for (int j = 2; j < res::loader::levels.data()[i].objects.size(); j++) {
+			const object& obj = res::loader::levels.data()[i].objects.data()[j];
+			out << (int)obj.type << ' ' << obj.x << ' ' << obj.y << ' '
+				<< (int)obj.orientation << ' ' << (int)obj.randomize;
+			if (obj.type == object::enum_type::MOVING_WALL
+				|| obj.type == object::enum_type::MOVING_BLOCK
+				|| obj.type == object::enum_type::MOVING_CRYSTAL)
+				out << ' ' << obj.x2 << ' ' << obj.y2 << ' ' << obj.data;
+			else if (obj.type == object::enum_type::DOOR || obj.type == object::enum_type::MIRROR_DOOR)
+				out << ' ' << obj.data;
+			out << '\n';
+		}
+	}
+	std::flush(out);
+	bool success = !out.fail();
+	out.close();
+	return success;
 }
 
 namespace keybinds {

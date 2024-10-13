@@ -1,8 +1,6 @@
 #ifndef _HEAD_HPP_
 #define _HEAD_HPP_
 
-// Yes, I used 4 different data structures in this thing
-// Why did I use them? I don't even know anymore
 #include <deque>
 #include <list>
 #include <unordered_map>
@@ -36,8 +34,6 @@ inline bool operator==(const vec& left, const vec& right) {
 }
 
 struct rect {
-	static const rect background;
-
 	GLint x, y;
 	GLsizei width, height;
 	vec colour;
@@ -54,6 +50,9 @@ class group;
 
 class object {
 public:
+	static const vec default_colour;
+	static const GLfloat default_noise;
+
 	static object* selected;
 	static object* previous;
 	static std::list<group> groups;
@@ -83,14 +82,14 @@ public:
 	group* linked;
 	enum_orientation orientation;
 	enum_type type;
-	int data;
 	std::vector<rect>* texture;
-	// There might eventually be objects with multiple hitboxes
-	std::vector<struct box>* hitbox;
-	
+	std::vector<box>* hitbox;
+	int data;
+	bool randomize;
+
 	object(void);
 	object(double x, double y, int width, int height, enum_orientation direction, enum_type type,
-		std::vector<rect>* tex, std::vector<struct box>* hbox, int data);
+		std::vector<rect>* tex, std::vector<box>* hbox, int data, bool randomize);
 	
 	static bool overlapping(const object& obj1, const object& obj2);
 
@@ -122,7 +121,7 @@ public:
 
 	// This program uses approximations to make level design ever so slightly easier
 	// The fact that arctan 1/3 + arctan 1/2 = pi/4 is pretty nice
-	// Note: changing this system will require modifications to the rest of the code, good luck
+	// Note: changing this system will require modifications to the rest of the code, have fun
 	enum class enum_direction {
 		E, E_ATAN1_3, E_ATAN1_2, NE, E_ATAN2, E_ATAN3,
 		N, N_ATAN1_3, N_ATAN1_2, NW, N_ATAN2, N_ATAN3,
@@ -177,6 +176,21 @@ public:
 	void destroy(void);
 };
 
+namespace game {
+	extern bool started;
+	extern bool hint;
+	extern long long frame;
+	extern bool hardcore;
+	extern int level;
+	extern int failures;
+	extern int sensors;
+	extern int activated;
+	extern double time;
+	extern std::string save;
+	extern std::string name;
+	extern bool custom;
+}
+
 namespace res {
 	extern GLuint rect_vao;
 	extern std::vector<object> objects;
@@ -192,9 +206,8 @@ namespace res {
 			std::string hint;
 			bool hint_seen;
 			std::vector<object> objects;
-			bool randomize;
 
-			inline level(void) : hint_seen(false), randomize(true) {}
+			inline level(void) : hint_seen(false) {}
 		};
 		extern std::vector<rect> textures[32];
 		extern std::vector<box> hitboxes[32];
@@ -206,6 +219,8 @@ namespace res {
 		void load_level(int level, bool randomize_orientation);
 		std::vector<rect>* get_tex(object::enum_type type);
 		std::vector<box>* get_hbx(object::enum_type type);
+		const rect& background(int level = game::level);
+		void set_background(int level, const vec colour, float noise);
 	}
 	void load_vao(void);
 }
@@ -216,26 +231,17 @@ namespace keybinds {
 	extern int hint;
 }
 
-namespace game {
-	extern bool started;
-	extern bool hint;
-	extern long long frame;
-	extern bool hardcore;
-	extern int level;
-	extern int failures;
-	extern int sensors;
-	extern int activated;
-	extern double time;
-	extern std::string save;
-}
-
 double intersect(double x1, double y1, double x2, double y2,
 	double x3, double y3, double x4, double y4);
 double obj_dist(double x, double y, const object& obj);
 bool interact(photon* const p, double dist, object* const obj,
 	box const* const hitbox, int line, int tps, std::list<photon>::iterator* iter);
 void select(int key);
+void render_bars(void);
 void render_text(std::string text, int x, int y, int width, int size, bool cursor, size_t cursor_pos, vec colour);
+
+unsigned mix32_rand(void);
+unsigned mix32_rand(unsigned n);
 
 inline double distance(double x1, double y1, double x2, double y2) {
 	return std::sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
