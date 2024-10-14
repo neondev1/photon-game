@@ -4,21 +4,21 @@
 #include <fstream>
 #include <thread>
 
-#ifdef _DEBUG
-#include <iostream>
-#endif // _DEBUG
+#ifdef LOGIC_TEST
+#	include <iostream>
+#endif // LOGIC_TEST
 
 #ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif // NOMINMAX
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif // WIN32_LEAN_AND_MEAN
-#ifndef VC_EXTRALEAN
-#define VC_EXTRALEAN
-#endif // VC_EXTRALEAN
-#include <windows.h>
+#	ifndef NOMINMAX
+#		define NOMINMAX
+#	endif // NOMINMAX
+#	ifndef WIN32_LEAN_AND_MEAN
+#		define WIN32_LEAN_AND_MEAN
+#	endif // WIN32_LEAN_AND_MEAN
+#	ifndef VC_EXTRALEAN
+#		define VC_EXTRALEAN
+#	endif // VC_EXTRALEAN
+#	include <windows.h>
 #endif // _WIN32
 
 #include <glad/glad.h>
@@ -43,9 +43,9 @@ void text_cb(GLFWwindow* window, unsigned codepoint);
 void key_cb(GLFWwindow* window, int key, int scancode, int action, int mods);
 
 // Debugging function
-#ifdef _DEBUG
+#ifdef LOGIC_TEST
 static bool list_nodes(node* root, int depth);
-#endif
+#endif // LOGIC_TEST
 
 long long game::frame = -1;
 
@@ -121,10 +121,11 @@ int main(void) {
 	int skipped = 1;
 	constexpr std::chrono::seconds zero(0);
 	constexpr std::chrono::seconds one(1);
+	const vec white(1.0f, 1.0f, 1.0f, 1.0f);
 	int tps = 64;
 #ifdef _DEBUG
-	/*
-	// Debugging code, comment this out when not debugging logic
+#	ifdef LOGIC_TEST
+	// Debugging code; define `LOGIC_TEST` in head.hpp to use
 	while (1) {
 		std::string s;
 		std::cin >> s;
@@ -176,7 +177,7 @@ int main(void) {
 			std::cout << "Fail" << std::endl;
 		list_nodes(NULL, 0);
 	}
-	*/
+#	endif // LOGIC_TEST
 #endif // _DEBUG
 	while (!glfwWindowShouldClose(gui::window)) {
 		if (gui::quit)
@@ -200,7 +201,7 @@ int main(void) {
 				int fails = game::failures, level = game::level;
 				for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end();) {
 					it->tick(tps, len, &it);
-					if (game::level > level)
+					if (game::level > level || game::failures > fails)
 						break;
 				}
 				if (game::level > level) {
@@ -269,6 +270,52 @@ int main(void) {
 					}
 				}
 				else if (game::hardcore) {
+					for (int i = 0; i < 2; i++) {
+						glClear(GL_COLOR_BUFFER_BIT);
+						for (int layer = 0; layer < 7; layer++)
+							for (int i = 0; i < res::objects.size(); i++)
+								res::objects.data()[i].render(layer);
+						for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end(); ++it)
+							it->render();
+						render_bars();
+						render_text(std::string("Time: ") + gui::time(game::time),
+							10, 9, 1260, 2, false, 0, white);
+						std::string fail_str = std::string("Fails: ") + std::to_string(game::failures);
+						render_text(fail_str, 1274 - 18 * (int)fail_str.length(),
+							9, 1260, 2, false, 0, white);
+						render_text(std::string("Level ") + std::to_string(game::level + 1) + std::string("/") + std::to_string(res::loader::levels.size()),
+							10, 689, 1260, 2, false, 0, white);
+						if (game::custom) {
+							std::string name_str = std::string("Map: ") + game::name;
+							render_text(name_str, 1274 - 18 * (int)name_str.length(),
+								689, 1260, 2, false, 0, white);
+						}
+						glfwSwapBuffers(gui::window);
+					}
+					for (int i = 3; i <= 10; i++) {
+						game::reason->render(-2, i);
+						std::this_thread::sleep_for(std::chrono::milliseconds(30));
+						glfwSwapBuffers(gui::window);
+					}
+					std::this_thread::sleep_for(std::chrono::milliseconds(300));
+					for (int i = 5; i <= 10; i++) {
+						glEnable(GL_SCISSOR_TEST);
+						glScissor(0, 0, 1280, 720);
+						glEnable(GL_BLEND);
+						glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+						glUniform4f(glGetUniformLocation(res::shaders::rectangle, "colour"), 1.0f, 1.0f, 1.0f, i * 0.1f);
+						glUniform1f(glGetUniformLocation(res::shaders::rectangle, "noise"), 0);
+						glUniform1f(glGetUniformLocation(res::shaders::rectangle, "pxsize"), (GLfloat)PX_SIZE);
+						glUseProgram(res::shaders::rectangle);
+						glBindVertexArray(res::rect_vao);
+						glDrawArrays(GL_TRIANGLES, 0, 6);
+						glBindVertexArray(0);
+						glDisable(GL_BLEND);
+						glDisable(GL_SCISSOR_TEST);
+						std::this_thread::sleep_for(std::chrono::milliseconds(30));
+						glfwSwapBuffers(gui::window);
+					}
+					std::this_thread::sleep_for(std::chrono::seconds(3));
 					photon::deleting.clear();
 					photon::nodes.clear();
 					photon::photons.clear();
@@ -292,10 +339,38 @@ int main(void) {
 					gui::menu = true;
 				}
 				else {
+					for (int i = 0; i < 2; i++) {
+						glClear(GL_COLOR_BUFFER_BIT);
+						for (int layer = 0; layer < 7; layer++)
+							for (int i = 0; i < res::objects.size(); i++)
+								res::objects.data()[i].render(layer);
+						for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end(); ++it)
+							it->render();
+						render_bars();
+						render_text(std::string("Time: ") + gui::time(game::time),
+							10, 9, 1260, 2, false, 0, white);
+						std::string fail_str = std::string("Fails: ") + std::to_string(game::failures);
+						render_text(fail_str, 1274 - 18 * (int)fail_str.length(),
+							9, 1260, 2, false, 0, white);
+						render_text(std::string("Level ") + std::to_string(game::level + 1) + std::string("/") + std::to_string(res::loader::levels.size()),
+							10, 689, 1260, 2, false, 0, white);
+						if (game::custom) {
+							std::string name_str = std::string("Map: ") + game::name;
+							render_text(name_str, 1274 - 18 * (int)name_str.length(),
+								689, 1260, 2, false, 0, white);
+						}
+						glfwSwapBuffers(gui::window);
+					}
+					for (int i = 1; i <= 5; i++) {
+						game::reason->render(-2, i);
+						std::this_thread::sleep_for(std::chrono::milliseconds(30));
+						glfwSwapBuffers(gui::window);
+					}
 					std::this_thread::sleep_for(one);
 					res::loader::load_level(game::level, true);
 					game::frame = -1;
 				}
+				game::reason = NULL;
 			}
 			if (cur < next || skipped > 5) {
 				game::frame++;
@@ -420,17 +495,16 @@ int main(void) {
 					for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end(); ++it)
 						it->render();
 					render_bars();
-					static const vec white(1.0f, 1.0f, 1.0f, 1.0f);
 					render_text(std::string("Time: ") + gui::time(game::time),
 						10, 9, 1260, 2, false, 0, white);
 					std::string fail_str = std::string("Fails: ") + std::to_string(game::failures);
-					render_text(fail_str, 1256 - 16 * (int)fail_str.length(),
+					render_text(fail_str, 1274 - 18 * (int)fail_str.length(),
 						9, 1260, 2, false, 0, white);
 					render_text(std::string("Level ") + std::to_string(game::level + 1) + std::string("/") + std::to_string(res::loader::levels.size()),
 						10, 689, 1260, 2, false, 0, white);
 					if (game::custom) {
 						std::string name_str = std::string("Map: ") + game::name;
-						render_text(name_str, 1256 - 16 * (int)name_str.length(),
+						render_text(name_str, 1274 - 18 * (int)name_str.length(),
 							689, 1260, 2, false, 0, white);
 					}
 				}
@@ -618,8 +692,7 @@ namespace keybinds {
 	int hint = GLFW_KEY_H;
 }
 
-#ifdef _DEBUG
-// Debugging function
+#ifdef LOGIC_TEST
 static bool list_nodes(node* root, int depth) {
 	std::vector<photon*> items;
 	std::vector<node*> children;
@@ -653,4 +726,4 @@ static bool list_nodes(node* root, int depth) {
 		list_nodes(children.data()[i], depth + 1);
 	return false;
 }
-#endif _DEBUG
+#endif // LOGIC_TEST

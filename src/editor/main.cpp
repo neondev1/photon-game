@@ -7,16 +7,16 @@
 #include <thread>
 
 #ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif // NOMINMAX
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif // WIN32_LEAN_AND_MEAN
-#ifndef VC_EXTRALEAN
-#define VC_EXTRALEAN
-#endif // VC_EXTRALEAN
-#include <windows.h>
+#	ifndef NOMINMAX
+#		define NOMINMAX
+#	endif // NOMINMAX
+#	ifndef WIN32_LEAN_AND_MEAN
+#		define WIN32_LEAN_AND_MEAN
+#	endif // WIN32_LEAN_AND_MEAN
+#	ifndef VC_EXTRALEAN
+#		define VC_EXTRALEAN
+#	endif // VC_EXTRALEAN
+#	include <windows.h>
 #endif // _WIN32
 
 #include <glad/glad.h>
@@ -753,8 +753,11 @@ int main(void) {
 						len = it->_tick;
 				}
 				int fails = game::failures, level = game::level;
-				for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end();)
+				for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end();) {
 					it->tick(tps, len, &it);
+					if (game::level > level || game::failures > fails)
+						break;
+				}
 				if (game::level > level)
 					break;
 				else if (game::failures == fails) {

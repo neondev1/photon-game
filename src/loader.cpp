@@ -295,6 +295,7 @@ namespace game {
 	bool hardcore = false;
 	int level = 0;
 	int failures = 0;
+	object* reason;
 	int sensors = 0;
 	int activated = 0;
 	double time = 0.0;

@@ -93,7 +93,7 @@ public:
 	
 	static bool overlapping(const object& obj1, const object& obj2);
 
-	void render(int layer) const;
+	void render(int layer, int param = 0) const;
 	void border(bool clear = false) const;
 	void tick(int tps);
 	inline virtual bool on_screen(void) const { return x < 1280 / PX_SIZE && x + width > 0 && y < 720 / PX_SIZE && y + height > 0; };
@@ -183,6 +183,7 @@ namespace game {
 	extern bool hardcore;
 	extern int level;
 	extern int failures;
+	extern object* reason;
 	extern int sensors;
 	extern int activated;
 	extern double time;
@@ -237,6 +238,7 @@ double obj_dist(double x, double y, const object& obj);
 bool interact(photon* const p, double dist, object* const obj,
 	box const* const hitbox, int line, int tps, std::list<photon>::iterator* iter);
 void select(int key);
+
 void render_bars(void);
 void render_text(std::string text, int x, int y, int width, int size, bool cursor, size_t cursor_pos, vec colour);
 

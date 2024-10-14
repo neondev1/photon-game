@@ -67,7 +67,7 @@ bool object::overlapping(const object& obj1, const object& obj2) {
 	return false;
 }
 
-void object::render(int layer) const {
+void object::render(int layer, int param) const {
 	if (!on_screen())
 		return;
 	if (!texture) {
@@ -91,8 +91,7 @@ void object::render(int layer) const {
 		glDisable(GL_SCISSOR_TEST);
 		return;
 	}
-	if (layer == -1) {
-		glEnable(GL_SCISSOR_TEST);
+	if (layer < 0) {
 		GLint __x = x * PX_SIZE;
 		GLint __y = y * PX_SIZE;
 		GLsizei w = width * PX_SIZE;
@@ -105,20 +104,37 @@ void object::render(int layer) const {
 			h += __y;
 			__y = 0;
 		}
+		if (__x + w > 1280)
+			w = 1280 - __x;
+		if (__y + h > 640)
+			h = 640 - __y;
 		if (w > 0 && h > 0 && x < 1280 && y < 640) {
+			glEnable(GL_SCISSOR_TEST);
 			glScissor(x * PX_SIZE, 40 + y * PX_SIZE, width * PX_SIZE, height * PX_SIZE);
-			glUniform4fv(glGetUniformLocation(res::shaders::rectangle, "colour"), 1,
-				res::loader::background().colour.ptr());
-			glUniform1f(glGetUniformLocation(res::shaders::rectangle, "noise"),
-				res::loader::background().noise);
-			glUniform1f(glGetUniformLocation(res::shaders::rectangle, "pxsize"), (GLfloat)PX_SIZE);
-			glUniform2f(glGetUniformLocation(res::shaders::rectangle, "offset"),
-				(GLfloat)res::objects.data()[0].offset,
-				(GLfloat)res::objects.data()[0].offset);
+			if (layer == -1) {
+				glUniform4fv(glGetUniformLocation(res::shaders::rectangle, "colour"), 1,
+					res::loader::background().colour.ptr());
+				glUniform1f(glGetUniformLocation(res::shaders::rectangle, "noise"),
+					res::loader::background().noise);
+				glUniform1f(glGetUniformLocation(res::shaders::rectangle, "pxsize"), (GLfloat)PX_SIZE);
+				glUniform2f(glGetUniformLocation(res::shaders::rectangle, "offset"),
+					(GLfloat)res::objects.data()[0].offset,
+					(GLfloat)res::objects.data()[0].offset);
+			}
+			else {
+				glEnable(GL_BLEND);
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+				const vec colour = game::hardcore ? vec(1.0f, 1.0f, 1.0f, param * 0.1f) : vec(1.0f, 0.1f, 0.1f, param * 0.1f);
+				glUniform4fv(glGetUniformLocation(res::shaders::rectangle, "colour"), 1, colour.ptr());
+				glUniform1f(glGetUniformLocation(res::shaders::rectangle, "noise"), 0.0f);
+				glUniform1f(glGetUniformLocation(res::shaders::rectangle, "pxsize"), (GLfloat)PX_SIZE);
+			}
 			glUseProgram(res::shaders::rectangle);
 			glBindVertexArray(res::rect_vao);
 			glDrawArrays(GL_TRIANGLES, 0, 6);
 			glBindVertexArray(0);
+			if (layer != -1)
+				glDisable(GL_BLEND);
 			glDisable(GL_SCISSOR_TEST);
 		}
 		return;
@@ -224,6 +240,10 @@ void object::render(int layer) const {
 			h += __y;
 			__y = 0;
 		}
+		if (__x + w > 1280)
+			w = 1280 - __x;
+		if (__y + h > 640)
+			h = 640 - __y;
 		if (w <= 0 || h <= 0 || __x > 1280 || __y > 640)
 			continue;
 		glEnable(GL_SCISSOR_TEST);
@@ -297,6 +317,10 @@ void object::border(bool clear) const {
 			h += __y;
 			__y = 0;
 		}
+		if (__x + w > 1280)
+			w = 1280 - __x;
+		if (__y + h > 640)
+			h = 640 - __y;
 		if (w <= 0 || h <= 0 || __x > 1280 || __y > 640)
 			continue;
 		glEnable(GL_SCISSOR_TEST);

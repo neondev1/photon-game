@@ -318,34 +318,39 @@ bool interact(photon* const p, double dist, object* const obj,
 	}
 	case object::enum_type::SPDC_CRYSTAL:
 	case object::enum_type::MOVING_CRYSTAL: {
-		//if (!p->medium || p->medium->type != object::enum_type::SPDC_CRYSTAL)
-		//	p->medium = obj;
-		//else {
-		p->medium = NULL;
-		p->dc++;
-		int dir = (int)p->direction;
-		photon::enum_direction dir1 = (photon::enum_direction)(dir == 0 ? 23 : dir - 1);
-		photon::enum_direction dir2 = (photon::enum_direction)(dir == 23 ? 0 : dir + 1);
-		node* n;
-		if (!p->parent)
-			n = NULL;
-		else if (p->parent->type != node::enum_node::SPDC) {
-			n = p->parent->add(node::enum_node::SPDC);
-			node::move(p, n);
+#ifndef LOGIC_TEST
+		if (!p->medium || p->medium->type != object::enum_type::SPDC_CRYSTAL)
+			p->medium = obj;
+		else {
+#endif // LOGIC_TEST
+			p->medium = NULL;
+			p->dc++;
+			int dir = (int)p->direction;
+			photon::enum_direction dir1 = (photon::enum_direction)(dir == 0 ? 23 : dir - 1);
+			photon::enum_direction dir2 = (photon::enum_direction)(dir == 23 ? 0 : dir + 1);
+			node* n;
+			if (!p->parent)
+				n = NULL;
+			else if (p->parent->type != node::enum_node::SPDC) {
+				n = p->parent->add(node::enum_node::SPDC);
+				node::move(p, n);
+			}
+			else
+				n = p->parent;
+			photon::photons.push_back(photon(p->texture, p->_x, p->_y, dir1, p->dc, p->split, n));
+			photon* np = &photon::photons.back();
+			if (n)
+				n->items.push_back(np);
+			np->interacted.push_back(obj);
+			np->immune.push_back(tps < 32 ? 1 : 2);
+			p->direction = dir2;
+#ifndef LOGIC_TEST
 		}
-		else
-			n = p->parent;
-		photon::photons.push_back(photon(p->texture, p->_x, p->_y, dir1, p->dc, p->split, n));
-		photon* np = &photon::photons.back();
-		if (n)
-			n->items.push_back(np);
-		np->interacted.push_back(obj);
-		np->immune.push_back(tps < 32 ? 1 : 2);
-		p->direction = dir2;
-		//}
+#endif // LOGIC_TEST
 		break;
 	}
 	case object::enum_type::BOMB: {
+		game::reason = obj;
 		node* n = p->parent;
 		if (!n)
 			game::failures++;
@@ -552,7 +557,7 @@ void select(int key) {
 		return;
 	object::previous = object::selected;
 	object* best = NULL;
-	const static object::enum_type unselectables[] = {
+	static constexpr object::enum_type unselectables[] = {
 		object::enum_type::WALL,
 		object::enum_type::DIAGONAL_MIRROR, object::enum_type::MIRROR_BLOCK,
 		object::enum_type::FIXED_BLOCK, object::enum_type::PRISM,
@@ -560,7 +565,7 @@ void select(int key) {
 		object::enum_type::BOMB, object::enum_type::SENSOR,
 		object::enum_type::NONE
 	};
-	const static object::enum_type* end = unselectables + sizeof(unselectables) / sizeof(object::enum_type);
+	static const object::enum_type* end = unselectables + sizeof(unselectables) / sizeof(object::enum_type);
 	// I'm sorry
 	if (key == keybinds::up) {
 		for (int i = 0; i < res::objects.size(); i++) {

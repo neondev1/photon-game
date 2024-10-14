@@ -26,7 +26,7 @@ I'll probably include the level editor alongside [releases](https://github.com/n
 To compile the level editor on Windows with MSVC, build the project in Visual Studio using the EditorRelease configuration. If you are compiling using something other than MSVC, simply exclude the original `main.cpp` file from compilation and include `editor/main.cpp` instead.
 
 > [!NOTE]
-> To load a custom map into the regular game client, rename the exported level file to `levels` (no extension) and put it in the same directory as the executable. The game should automatically load the map when restarted. (In the future, I may create a map loader to make this easier.)
+> To load a custom map into the regular game client, rename the exported level file to `levels` (no file extension) and put it in the same directory as the executable. The game should automatically load the map when restarted. (In the future, I may create a separate map loader to make this easier.)
 
 ## Credits
 
