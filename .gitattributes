@@ -1,2 +1,2 @@
-include/** linguist-vendored
-glad.c -linguist-vendored
+include/** linguist-vendored=true
+glad.c linguist-vendored=true

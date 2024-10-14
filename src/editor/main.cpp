@@ -152,6 +152,8 @@ int main(void) {
 				object::enum_type::MOVING_WALL, object::enum_type::MOVING_BLOCK, object::enum_type::MOVING_CRYSTAL
 			};
 			static const object::enum_type* end = toggleable + sizeof(toggleable) / sizeof(object::enum_type);
+			static constexpr std::streamsize stream_max = std::numeric_limits<std::streamsize>::max();
+			std::string discard;
 			if (cmd == "help") {
 				std::cout << "All parameters in [square brackets] are integers.\nAll parameters in (parentheses) are strings.\nAll parameters in {curly braces} are floating-point (decimal) numbers.\n";
 				std::cout << "List of commands:\n";
@@ -175,6 +177,10 @@ int main(void) {
 				std::cout << "              - Places an object of type [type] at ([x], [y]) with orientation [o]. See `cheatsheet`.\n";
 				std::cout << "move [id] [x] [y] [o]\n";
 				std::cout << "              - Moves the object specified by [id] to coordinates ([x], [y]) and orientation [o].\n";
+				std::cout << "resize [id] [width] [height]\n";
+				std::cout << "size   [id] [width] [height]\n";
+				std::cout << "              - Resizes the object specified by [id] to have width [width] and height [height].\n";
+				std::cout << "                Only works with WALL/DOOR/MOVING_WALL/FIXED_BLOCK/MOVING_BLOCK/SPDC_CRYSTAL/MOVING_CRYSTAL.\n";
 				std::cout << "random [id] [bool]\n";
 				std::cout << "              - If set to 1, the orientation (if rotatable) or state (if toggleable, not movable, and not linked\n";
 				std::cout << "                to any other object) of the object with id [id] is randomized at the beginning of every attempt.\n";
@@ -224,6 +230,15 @@ int main(void) {
 				std::cout << " NONE      = 24      |                     |" << std::endl;
 			}
 			else if (cmd == "load" || cmd == "import") {
+				std::string path;
+				std::getline(std::cin, path);
+				if (path.empty()) {
+					std::cout << "No path specified" << std::endl;
+					continue;
+				}
+				path = path.substr(1);
+				std::cin.clear();
+				std::cin.ignore(stream_max, '\n');
 				if (unsaved) {
 					char c;
 					do {
@@ -234,7 +249,8 @@ int main(void) {
 					} while (c != 'Y' && c != 'N');
 					if (c == 'Y') {
 						if (game::save.empty()) {
-							std::getline(std::cin, game::save);
+							std::cin.clear();
+							std::cin.ignore(stream_max, '\n');
 							std::cout << "Enter a filename: ";
 							std::getline(std::cin, game::save);
 						}
@@ -246,9 +262,6 @@ int main(void) {
 							unsaved = false;
 					}
 				}
-				std::string path;
-				std::getline(std::cin, path);
-				path = path.substr(1);
 				if (fs::is_regular_file(path)) {
 					if (!res::loader::load_from_file(path))
 						std::cout << "Failed to read level file" << std::endl;
@@ -261,6 +274,10 @@ int main(void) {
 			else if (cmd == "export") {
 				std::string path;
 				std::getline(std::cin, path);
+				if (path.empty()) {
+					std::cout << "No path specified" << std::endl;
+					continue;
+				}
 				path = path.substr(1);
 				if (fs::is_regular_file(path)) {
 					char c;
@@ -311,14 +328,14 @@ int main(void) {
 				}
 				catch (...) {
 					std::cout << "Invalid input" << std::endl;
-					std::string s;
-					std::getline(std::cin, s);
+					std::cin.clear();
+					std::cin.ignore(stream_max, '\n');
 					continue;
 				}
 				if (n < 1) {
 					std::cout << "Invalid input" << std::endl;
-					std::string s;
-					std::getline(std::cin, s);
+					std::cin.clear();
+					std::cin.ignore(stream_max, '\n');
 					continue;
 				}
 				if ((size_t)(n - 1) == res::loader::levels.size()) {
@@ -348,14 +365,14 @@ int main(void) {
 				}
 				catch (...) {
 					std::cout << "Invalid input" << std::endl;
-					std::string s;
-					std::getline(std::cin, s);
+					std::cin.clear();
+					std::cin.ignore(stream_max, '\n');
 					continue;
 				}
 				if (n < 1 || n > res::loader::levels.size()) {
 					std::cout << "Invalid input" << std::endl;
-					std::string s;
-					std::getline(std::cin, s);
+					std::cin.clear();
+					std::cin.ignore(stream_max, '\n');
 					continue;
 				}
 				if (res::loader::levels.size() <= 1) {
@@ -383,8 +400,8 @@ int main(void) {
 				}
 				catch (...) {
 					std::cout << "Invalid input" << std::endl;
-					std::string s;
-					std::getline(std::cin, s);
+					std::cin.clear();
+					std::cin.ignore(stream_max, '\n');
 					continue;
 				}
 				randomize = r;
@@ -392,7 +409,10 @@ int main(void) {
 			else if (cmd == "text") {
 				std::string text;
 				std::getline(std::cin, text);
-				res::loader::levels.data()[game::level].hint = text.substr(1);
+				if (text.empty())
+					res::loader::levels.data()[game::level].hint.clear();
+				else
+					res::loader::levels.data()[game::level].hint = text.substr(1);
 				unsaved = true;
 			}
 			else if (cmd == "rmtext") {
@@ -411,14 +431,14 @@ int main(void) {
 				}
 				catch (...) {
 					std::cout << "Invalid input" << std::endl;
-					std::string s;
-					std::getline(std::cin, s);
+					std::cin.clear();
+					std::cin.ignore(stream_max, '\n');
 					continue;
 				}
 				if (r < 0.0f || r > 1.0f || g < 0.0f || g > 1.0f || b < 0.0f || b > 1.0f || noise < 0.0f) {
 					std::cout << "Invalid input" << std::endl;
-					std::string s;
-					std::getline(std::cin, s);
+					std::cin.clear();
+					std::cin.ignore(stream_max, '\n');
 					continue;
 				}
 				res::loader::set_background(game::level, vec(r, g, b, 1.0f), noise);
@@ -445,15 +465,15 @@ int main(void) {
 				}
 				catch (...) {
 					std::cout << "Invalid input" << std::endl;
-					std::string s;
-					std::getline(std::cin, s);
+					std::cin.clear();
+					std::cin.ignore(stream_max, '\n');
 					continue;
 				}
 				if (o < 0 || o > (int)object::enum_orientation::NONE
 					|| type < 0 || type > (int)object::enum_type::NONE) {
 					std::cout << "Invalid input" << std::endl;
-					std::string s;
-					std::getline(std::cin, s);
+					std::cin.clear();
+					std::cin.ignore(stream_max, '\n');
 					continue;
 				}
 				object::enum_type t = (object::enum_type)type;
@@ -476,8 +496,8 @@ int main(void) {
 							}
 							catch (...) {
 								std::cout << "Invalid input" << std::endl;
-								std::string s;
-								std::getline(std::cin, s);
+								std::cin.clear();
+								std::cin.ignore(stream_max, '\n');
 							}
 						}
 					}
@@ -489,16 +509,16 @@ int main(void) {
 							link = std::stoi(_link);
 							if (link < 0) {
 								std::cout << "Invalid input" << std::endl;
-								std::string s;
-								std::getline(std::cin, s);
+								std::cin.clear();
+								std::cin.ignore(stream_max, '\n');
 							}
 							else
 								break;
 						}
 						catch (...) {
 							std::cout << "Invalid input" << std::endl;
-							std::string s;
-							std::getline(std::cin, s);
+							std::cin.clear();
+							std::cin.ignore(stream_max, '\n');
 						}
 					}
 					if (t == object::enum_type::MOVING_WALL
@@ -526,16 +546,21 @@ int main(void) {
 				}
 				catch (...) {
 					std::cout << "Invalid input" << std::endl;
-					std::string s;
-					std::getline(std::cin, s);
+					std::cin.clear();
+					std::cin.ignore(stream_max, '\n');
 					continue;
 				}
 				id += 2;
-				if (id < 2 || id >= current->size()
-					|| o < 0 || o > (int)object::enum_orientation::NONE) {
+				if (id < 2 || id >= current->size()) {
+					std::cout << "ID out of range" << std::endl;
+					std::cin.clear();
+					std::cin.ignore(stream_max, '\n');
+					continue;
+				}
+				if (o < 0 || o > (int)object::enum_orientation::NONE) {
 					std::cout << "Invalid input" << std::endl;
-					std::string s;
-					std::getline(std::cin, s);
+					std::cin.clear();
+					std::cin.ignore(stream_max, '\n');
 					continue;
 				}
 				current->data()[id].x = x;
@@ -543,6 +568,45 @@ int main(void) {
 				current->data()[id].y = y;
 				current->data()[id]._y = y;
 				current->data()[id].orientation = (object::enum_orientation)o;
+				unsaved = true;
+			}
+			else if (cmd == "resize" || cmd == "size") {
+				std::string _id, _w, _h;
+				std::cin >> _id >> _w >> _h;
+				int id, w, h;
+				try {
+					id = std::stoi(_id);
+					w = std::stoi(_w);
+					h = std::stoi(_h);
+				}
+				catch (...) {
+					std::cout << "Invalid input" << std::endl;
+					std::cin.clear();
+					std::cin.ignore(stream_max, '\n');
+					continue;
+				}
+				id += 2;
+				if (id < 2 || id >= current->size()) {
+					std::cout << "ID out of range" << std::endl;
+					std::cin.clear();
+					std::cin.ignore(stream_max, '\n');
+					continue;
+				}
+				static constexpr object::enum_type types[] = {
+					object::enum_type::WALL, object::enum_type::DOOR, object::enum_type::FIXED_BLOCK, object::enum_type::SPDC_CRYSTAL,
+					object::enum_type::MOVING_WALL, object::enum_type::MOVING_BLOCK, object::enum_type::MOVING_CRYSTAL
+				};
+				static const object::enum_type* t_end = types + sizeof(types) / sizeof(object::enum_type);
+				if (std::find(types, t_end, current->data()[id].type) == t_end) {
+					std::cout << "This object cannot be resized.";
+					std::cin.clear();
+					std::cin.ignore(stream_max, '\n');
+					continue;
+				}
+				if (w < 10 || h < 10)
+					std::cout << "Note: Objects smaller than 10 by 10 may look strange" << std::endl;
+				current->data()[id].width = w;
+				current->data()[id].height = h;
 				unsaved = true;
 			}
 			else if (cmd == "random") {
@@ -556,15 +620,15 @@ int main(void) {
 				}
 				catch (...) {
 					std::cout << "Invalid input" << std::endl;
-					std::string s;
-					std::getline(std::cin, s);
+					std::cin.clear();
+					std::cin.ignore(stream_max, '\n');
 					continue;
 				}
 				id += 2;
 				if (id < 2 || id >= current->size()) {
 					std::cout << "ID out of range" << std::endl;
-					std::string s;
-					std::getline(std::cin, s);
+					std::cin.clear();
+					std::cin.ignore(stream_max, '\n');
 					continue;
 				}
 				object& obj = current->data()[id];
@@ -587,15 +651,15 @@ int main(void) {
 				}
 				catch (...) {
 					std::cout << "Invalid input" << std::endl;
-					std::string s;
-					std::getline(std::cin, s);
+					std::cin.clear();
+					std::cin.ignore(stream_max, '\n');
 					continue;
 				}
 				id += 2;
 				if (id < 2 || id >= current->size()) {
 					std::cout << "ID out of range" << std::endl;
-					std::string s;
-					std::getline(std::cin, s);
+					std::cin.clear();
+					std::cin.ignore(stream_max, '\n');
 					continue;
 				}
 				const object& obj = current->data()[id];
@@ -615,20 +679,24 @@ int main(void) {
 				}
 				catch (...) {
 					std::cout << "Invalid input" << std::endl;
-					std::string s;
-					std::getline(std::cin, s);
+					std::cin.clear();
+					std::cin.ignore(stream_max, '\n');
 					continue;
 				}
 				if (id < 0 || id >= current->size() - 2) {
 					std::cout << "ID out of range" << std::endl;
-					std::string s;
-					std::getline(std::cin, s);
+					std::cin.clear();
+					std::cin.ignore(stream_max, '\n');
 					continue;
 				}
 				current->erase(current->begin() + (id + 2));
 				unsaved = true;
 			}
 			else if (cmd == "clear") {
+				if (current->empty()) {
+					std::cout << "Nothing to clear." << std::endl;
+					continue;
+				}
 				char c;
 				do {
 					std::cout << "Are you sure you want to clear the current level? (Y/N) ";
@@ -657,14 +725,14 @@ int main(void) {
 				}
 				catch (...) {
 					std::cout << "Invalid input" << std::endl;
-					std::string s;
-					std::getline(std::cin, s);
+					std::cin.clear();
+					std::cin.ignore(stream_max, '\n');
 					continue;
 				}
 				if (dir >= (int)photon::enum_direction::NONE) {
 					std::cout << "Invalid input" << std::endl;
-					std::string s;
-					std::getline(std::cin, s);
+					std::cin.clear();
+					std::cin.ignore(stream_max, '\n');
 					continue;
 				}
 				current->data()[0].x = x;
@@ -705,7 +773,8 @@ int main(void) {
 					} while (c != 'Y' && c != 'N');
 					if (c == 'Y') {
 						if (game::save.empty()) {
-							std::getline(std::cin, game::save);
+							std::cin.clear();
+							std::cin.ignore(stream_max, '\n');
 							std::cout << "Enter a filename: ";
 							std::getline(std::cin, game::save);
 						}
@@ -719,11 +788,10 @@ int main(void) {
 				glfwTerminate();
 				return EXIT_SUCCESS;
 			}
-			else {
+			else
 				std::cout << "Unrecognized command" << std::endl;
-				std::string s;
-				std::getline(std::cin, s);
-			}
+			std::cin.clear();
+			std::cin.ignore(stream_max, '\n');
 		}
 		while (!glfwWindowShouldClose(window)) {
 			glfwPollEvents();

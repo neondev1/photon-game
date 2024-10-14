@@ -10,7 +10,7 @@ A (terrible) sprite-less puzzle game cobbled together with OpenGL, originally co
 
 ## Instructions
 
-Releases can probably be found under the "Releases" heading on the right-hand side of the page or [here](https://github.com/neondev1/photon-game/releases), if I actually remember to eventually add them. No installation is required, but you should probably put the executable in its own directory since it'll make some files and I'm sure you wouldn't want this game cluttering up your otherwise organized directories.
+Releases can probably be found under the "Releases" heading on the right-hand side of the page or [here](https://github.com/neondev1/photon-game/releases), if I actually remember to eventually add them. No installation is required, but you should probably put the executable in its own directory since it will create some files and I'm sure you wouldn't want this game cluttering up your directories.
 
 > [!IMPORTANT]
 > In any case, if you are compiling the binaries yourself, make sure to exclude `editor/main.cpp` from compilation unless you are compiling the level editor. This should have already been done in the project settings if you use the Visual Studio project files provided with this repo, so no action is necessary if you are using MSVC.

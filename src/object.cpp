@@ -166,7 +166,7 @@ void object::render(int layer, int param) const {
 		unsigned key = (unsigned short)width | ((unsigned short)height << 12) | ((unsigned char)type << 24);
 		if (type == enum_type::DOOR)
 			key |= (unsigned char)toggle << 31;
-		static const enum_type types[] = {
+		static constexpr enum_type types[] = {
 			enum_type::WALL, enum_type::FIXED_BLOCK, enum_type::SPDC_CRYSTAL,
 			enum_type::MOVING_WALL, enum_type::MOVING_BLOCK, enum_type::MOVING_CRYSTAL
 		};
@@ -178,18 +178,26 @@ void object::render(int layer, int param) const {
 			tex = &object::temp_tex[key];
 			for (int i = 0; i < tex->size(); i++) {
 				rect& r = tex->data()[i];
-				if (r.width == 1 && r.height == 1) {
+				if (r.colour == vec(0.21f, 0.26f, 0.29f, 1.0f)
+					|| r.colour == vec(0.8f, 1.0f, 0.9f, 0.1f)
+					|| r.colour == vec(0.7f, 0.7f, 0.5f, 0.3f)) {
+					r.x += (width - 20) / 2;
+					r.y += (height - 20) / 2;
+				}
+				else if (r.width == 1 && r.height == 1) {
 					if (r.x + r.y > 20) {
 						r.x += width - 20;
 						r.y += height - 20;
 					}
 				}
 				else if (r.width == 1) {
-					r.x += width - 20;
+					r.x *= width - 1;
+					r.x /= 19;
 					r.height += height - 20;
 				}
 				else if (r.height == 1) {
-					r.y += height - 20;
+					r.y *= height - 1;
+					r.y /= 19;
 					r.width += width - 20;
 				}
 				else {
