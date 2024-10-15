@@ -346,8 +346,10 @@ void render_text(std::string text, int x, int y, int width, int size, bool curso
 		if (text.data()[cur] == '\r' || text.data()[cur] == '\n') {
 			xpos = 0;
 			ypos++;
+			if (cur + 1 == cursor_pos && cursor)
+				draw(FONT_CURSOR, gl_x + xpos * size * 9, gl_y - ypos * size * 16, size, colour);
 		}
-		else {
+		else if (text.data()[cur] != ' ' || xpos != 0) {
 			draw(text.data()[cur], gl_x + xpos * size * 9, gl_y - ypos * size * 16, size, colour);
 			if (++xpos >= width) {
 				xpos = 0;
@@ -356,6 +358,8 @@ void render_text(std::string text, int x, int y, int width, int size, bool curso
 			if (cur + 1 == cursor_pos && cursor)
 				draw(FONT_CURSOR, gl_x + xpos * size * 9, gl_y - ypos * size * 16, size, colour);
 		}
+		else if (cur + 1 == cursor_pos && cursor)
+			draw(FONT_CURSOR, gl_x + xpos * size * 9, gl_y - ypos * size * 16, size, colour);
 	}
 	if (prev < text.length()) {
 		std::string token = text.substr(prev);

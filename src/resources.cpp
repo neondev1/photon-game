@@ -41,12 +41,12 @@ void main() {
 	if (noise != 0.0f) {
 		float angle = rand(floor(gl_FragCoord.xy / vec2(pxsize) + offset));
 		d = vec2(noise * cos(angle), noise * sin(angle));
-	if (max(colour.r, max(colour.g, colour.b)) == colour.r)
-		outcolour = vec4(colour.r, colour.g + d.x / 255.0, colour.b + d.y / 255.0, colour.a);
-	if (max(colour.r, max(colour.g, colour.b)) == colour.g)
-		outcolour = vec4(colour.r + d.y / 255.0, colour.g, colour.b + d.x / 255.0, colour.a);
-	if (max(colour.r, max(colour.g, colour.b)) == colour.b)
-		outcolour = vec4(colour.r + d.x / 255.0, colour.g + d.y / 255.0, colour.b, colour.a);
+		if (max(colour.r, max(colour.g, colour.b)) == colour.r)
+			outcolour = vec4(colour.r, colour.g + d.x / 255.0, colour.b + d.y / 255.0, colour.a);
+		if (max(colour.r, max(colour.g, colour.b)) == colour.g)
+			outcolour = vec4(colour.r + d.y / 255.0, colour.g, colour.b + d.x / 255.0, colour.a);
+		if (max(colour.r, max(colour.g, colour.b)) == colour.b)
+			outcolour = vec4(colour.r + d.x / 255.0, colour.g + d.y / 255.0, colour.b, colour.a);
 	}
 }
 )""\0";
@@ -449,7 +449,7 @@ void res::loader::load_tex(void) {
 		textures[23].push_back({ 2 + i, 5 - i, 1, 1, colour, 5.0f, 5 });
 		textures[23].push_back({ 14 + i, 17 - i, 1, 1, colour, 5.0f, 5 });
 	}
-	colour = vec(0.8f, 1.0f, 0.9f, 0.1f);
+	colour = COLOUR_MOVING_BLOCK;
 	textures[23].push_back({ 6, 9, 3, 2, colour, 3.0f, 6 });
 	textures[23].push_back({ 11, 9, 3, 2, colour, 3.0f, 6 });
 	textures[23].push_back({ 9, 6, 2, 8, colour, 3.0f, 6 });
@@ -593,7 +593,7 @@ void res::loader::load_tex(void) {
 		textures[31].push_back({ 1 + i, 1 + i, 18 - i * 2, 1, vec(0.05f, 0.05f, 0.05f, 1.0f), 0.0f, 4 });
 		textures[31].push_back({ 1 + i, 18 - i, 18 - i * 2, 1, vec(0.15f, 0.15f, 0.15f, 1.0f), 0.0f, 4 });
 	}
-	textures[31].push_back({ 9, 9, 2, 2, vec(0.3f, 0.9f, 0.6f, 1.0f), 10.0f, 4 });
+	textures[31].push_back({ 9, 9, 2, 2, COLOUR_SENSOR, 10.0f, 4 });
 }
 
 // In case someone wants to create their own hitboxes/mod the game/whatever:

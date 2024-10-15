@@ -65,6 +65,18 @@
 
 namespace fs = std::filesystem;
 
+#ifdef _WIN32
+extern "C" {
+#	ifdef __GNUC__
+	__attribute__((dllexport)) unsigned NvOptimusEnablement = 1;
+	__attribute__((dllexport)) unsigned AmdPowerXpressRequestHighPerformance = 1;
+#	elif defined(_MSC_VER) || defined(__clang__)
+	__declspec(dllexport) unsigned NvOptimusEnablement = 1;
+	__declspec(dllexport) unsigned AmdPowerXpressRequestHighPerformance = 1;
+#	endif // __GNUC__, defined(_MSC_VER) || defined(__clang__)
+}
+#endif // _WIN32
+
 void key_cb(GLFWwindow* window, int key, int scancode, int action, int mods);
 bool save_to_file(std::string path);
 
@@ -153,21 +165,25 @@ int main(void) {
 			};
 			static const object::enum_type* end = toggleable + sizeof(toggleable) / sizeof(object::enum_type);
 			static constexpr std::streamsize stream_max = std::numeric_limits<std::streamsize>::max();
-			std::string discard;
 			if (cmd == "help") {
-				std::cout << "All parameters in [square brackets] are integers.\nAll parameters in (parentheses) are strings.\nAll parameters in {curly braces} are floating-point (decimal) numbers.\n";
+				std::cout << "All parameters in [square brackets] are integers.\n";
+				std::cout << "All parameters in (parentheses) are strings.\n";
+				std::cout << "All parameters in {curly braces} are floating-point (decimal) numbers.\n";
 				std::cout << "List of commands:\n";
 				std::cout << "help          - Displays this list.\n";
 				std::cout << "cheatsheet    - Displays the numerical values of directions, orientations, and object types.\n";
 				std::cout << "load (path)   - Loads a level from a file for editing.\n";
 				std::cout << "import (path) - Loads a level from a file for editing.\n";
-				std::cout << "export (path) - Exports the level to a file. You can export the default level to see what the file is like.\n";
+				std::cout << "export (path) - Exports the level to a file. You can export the default level to inspect the file format.\n";
+				std::cout << "                (Note: The four strange integers at the beginning of every level is the RGB value of the\n";
+				std::cout << "                 background colour and the noise, type punned from `float` to `int` for storage purposes.)\n";
 				std::cout << "save          - Like `export`, but does not warn before overwriting. Must have used `load`/`import`/`export` first.\n";
 				std::cout << "name (str)    - Sets the name of the map to (str).\n";
 				std::cout << "levels        - Lists all levels as well as their object counts.\n";
 				std::cout << "level [n]     - Selects the [n]th level. If this level does not exist, it will be created.\n";
 				std::cout << "remove [n]    - Removes the [n]th level.\n";
-				std::cout << "text (str)    - Sets the text to be displayed before loading the selected level to (str).\n";
+				std::cout << "text (str)    - Sets the text to be displayed before loading the selected level to (str). Does not support newlines.\n";
+				std::cout << "append (str)  - Appends (str) to the text as set by the `text` command **on a new line**.\n";
 				std::cout << "rmtext        - Removes the text displayed before the selected level.\n";
 				std::cout << "background {r} {g} {b} {noise}\n";
 				std::cout << "              - Sets the background colour with RGB value ({r}, {g}, {b}) (default: (0.08, 0.08, 0.08))\n";
@@ -180,7 +196,7 @@ int main(void) {
 				std::cout << "resize [id] [width] [height]\n";
 				std::cout << "size   [id] [width] [height]\n";
 				std::cout << "              - Resizes the object specified by [id] to have width [width] and height [height].\n";
-				std::cout << "                Only works with WALL/DOOR/MOVING_WALL/FIXED_BLOCK/MOVING_BLOCK/SPDC_CRYSTAL/MOVING_CRYSTAL.\n";
+				std::cout << "                Only works with WALL, DOOR, MOVING_WALL, FIXED_BLOCK, MOVING_BLOCK, SPDC_CRYSTAL, and MOVING_CRYSTAL.\n";
 				std::cout << "random [id] [bool]\n";
 				std::cout << "              - If set to 1, the orientation (if rotatable) or state (if toggleable, not movable, and not linked\n";
 				std::cout << "                to any other object) of the object with id [id] is randomized at the beginning of every attempt.\n";
@@ -237,8 +253,6 @@ int main(void) {
 					continue;
 				}
 				path = path.substr(1);
-				std::cin.clear();
-				std::cin.ignore(stream_max, '\n');
 				if (unsaved) {
 					char c;
 					do {
@@ -254,12 +268,20 @@ int main(void) {
 							std::cout << "Enter a filename: ";
 							std::getline(std::cin, game::save);
 						}
+						else {
+							std::cin.clear();
+							std::cin.ignore(stream_max, '\n');
+						}
 						if (!save_to_file(game::save)) {
 							std::cout << "Something went wrong while writing to the file." << std::endl;
 							continue;
 						}
 						else
 							unsaved = false;
+					}
+					else {
+						std::cin.clear();
+						std::cin.ignore(stream_max, '\n');
 					}
 				}
 				if (fs::is_regular_file(path)) {
@@ -270,6 +292,7 @@ int main(void) {
 				}
 				else
 					std::cout << "File not found" << std::endl;
+				continue;
 			}
 			else if (cmd == "export") {
 				std::string path;
@@ -287,14 +310,20 @@ int main(void) {
 						std::cin >> s;
 						c = std::toupper(s.front());
 					} while (c != 'Y' && c != 'N');
-					if (c == 'N')
+					if (c == 'N') {
+						std::cin.clear();
+						std::cin.ignore(stream_max, '\n');
 						continue;
+					}
+					std::cin.clear();
+					std::cin.ignore(stream_max, '\n');
 				}
 				game::save = path;
 				if (!save_to_file(game::save))
 					std::cout << "Something went wrong while writing to the file." << std::endl;
 				else
 					unsaved = false;
+				continue;
 			}
 			else if (cmd == "save") {
 				if (game::save.empty()) {
@@ -309,7 +338,12 @@ int main(void) {
 			else if (cmd == "name") {
 				std::string name;
 				std::getline(std::cin, name);
-				game::name = name.substr(1);
+				if (name.empty())
+					game::name.clear();
+				else
+					game::name = name.substr(1);
+				unsaved = true;
+				continue;
 			}
 			else if (cmd == "levels") {
 				std::cout << game::name << '\n';
@@ -414,6 +448,17 @@ int main(void) {
 				else
 					res::loader::levels.data()[game::level].hint = text.substr(1);
 				unsaved = true;
+				continue;
+			}
+			else if (cmd == "append") {
+				std::string text;
+				std::getline(std::cin, text);
+				res::loader::levels.data()[game::level].hint += "\n\n";
+				if (text.empty())
+					continue;
+				res::loader::levels.data()[game::level].hint += text.substr(1);
+				unsaved = true;
+				continue;
 			}
 			else if (cmd == "rmtext") {
 				res::loader::levels.data()[game::level].hint.clear();
@@ -445,12 +490,15 @@ int main(void) {
 				unsaved = true;
 			}
 			else if (cmd == "list") {
+				const object& p = current->front();
+				std::cout << "spawn | x=" << p.x << ", y=" << p.y << ", direction=" << p.data << std::endl;
 				for (int i = 2; i < current->size(); i++) {
-					std::cout << "id=" << i - 2 << " | type=" << (int)current->data()[i].type
-						<< ", x=" << current->data()[i].x << ", y=" << current->data()[i].y
-						<< ", orientation=" << (int)current->data()[i].orientation
-						<< ", otherx=" << current->data()[i].x2 << ", othery=" << current->data()[i].y2
-						<< ", number=" << current->data()[i].data << std::endl;
+					const object& obj = current->data()[i];
+					std::cout << "id=" << i - 2 << " | type=" << (int)obj.type
+						<< ", x=" << obj.x << ", y=" << obj.y
+						<< ", orientation=" << (int)obj.orientation
+						<< ", otherx=" << obj.x2 << ", othery=" << obj.y2
+						<< ", number=" << obj.data << std::endl;
 				}
 			}
 			else if (cmd == "add") {
@@ -503,7 +551,7 @@ int main(void) {
 					}
 					while (1) {
 						try {
-							std::cout << "Enter a number. All toggleable objects with the same number (except 0) will move in tandem. ";
+							std::cout << "Enter a number. All toggleable objects with the same number (except 0) will be activated in tandem. ";
 							std::string _link;
 							std::cin >> _link;
 							link = std::stoi(_link);
@@ -826,8 +874,10 @@ int main(void) {
 					if (game::level > level || game::failures > fails)
 						break;
 				}
-				if (game::level > level)
+				if (game::level > level) {
+					game::level--;
 					break;
+				}
 				else if (game::failures == fails) {
 					bool fail = true;
 					for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end(); ++it) {
@@ -1064,7 +1114,11 @@ bool save_to_file(std::string path) {
 	std::ofstream out(path, std::ios::trunc);
 	out << game::name << '\n';
 	for (int i = 0; i < res::loader::levels.size(); i++) {
-		out << ' ' << res::loader::levels.data()[i].hint << '\n';
+		std::string& hint = res::loader::levels.data()[i].hint;
+		out << ' ' << std::count(hint.begin(), hint.end(), '\n') + (hint.empty() ? 0 : 1);
+		if (!hint.empty())
+			out << '\n';
+		out << hint << '\n';
 		const object& p = res::loader::levels.data()[i].objects.data()[0];
 		const rect& background = res::loader::background(i);
 		out << p.x << ' ' << p.y << ' ' << p.data << ' '

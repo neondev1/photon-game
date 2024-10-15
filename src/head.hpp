@@ -33,6 +33,11 @@ inline bool operator==(const vec& left, const vec& right) {
 	return left.x == right.x && left.y == right.y && left.z == right.z && left.w == right.w;
 }
 
+#define COLOUR_SENSOR       	vec(0.3f, 0.9f, 0.6f, 1.0f)
+#define COLOUR_MOVING_WALL  	vec(0.21f, 0.26f, 0.29f, 1.0f)
+#define COLOUR_MOVING_BLOCK 	vec(0.8f, 1.0f, 0.9f, 0.1f)
+#define COLOUR_MOVING_CRYSTAL	vec(0.7f, 0.7f, 0.5f, 0.3f)
+
 struct rect {
 	GLint x, y;
 	GLsizei width, height;
@@ -221,7 +226,7 @@ namespace res {
 		std::vector<rect>* get_tex(object::enum_type type);
 		std::vector<box>* get_hbx(object::enum_type type);
 		const rect& background(int level = game::level);
-		void set_background(int level, const vec colour, float noise);
+		void set_background(int level, const vec& colour, float noise);
 	}
 	void load_vao(void);
 }

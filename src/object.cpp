@@ -178,9 +178,9 @@ void object::render(int layer, int param) const {
 			tex = &object::temp_tex[key];
 			for (int i = 0; i < tex->size(); i++) {
 				rect& r = tex->data()[i];
-				if (r.colour == vec(0.21f, 0.26f, 0.29f, 1.0f)
-					|| r.colour == vec(0.8f, 1.0f, 0.9f, 0.1f)
-					|| r.colour == vec(0.7f, 0.7f, 0.5f, 0.3f)) {
+				if (r.colour == COLOUR_MOVING_WALL
+					|| r.colour == COLOUR_MOVING_BLOCK
+					|| r.colour == COLOUR_MOVING_CRYSTAL) {
 					r.x += (width - 20) / 2;
 					r.y += (height - 20) / 2;
 				}
@@ -258,8 +258,8 @@ void object::render(int layer, int param) const {
 		glScissor(__x, 40 + __y, w, h);
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		if (type == enum_type::SENSOR && quad.colour == vec(0.3f, 0.9f, 0.6f, 1.0f)) {
-			vec colour = data ? vec(0.3f, 0.9f, 0.6f, 1.0f) : vec(0.8f, 0.9f, 0.2f, 1.0f);
+		if (type == enum_type::SENSOR && quad.colour == COLOUR_SENSOR) {
+			const vec colour = data ? COLOUR_SENSOR : vec(0.8f, 0.9f, 0.2f, 1.0f);
 			glUniform4fv(glGetUniformLocation(res::shaders::rectangle, "colour"),
 				1, colour.ptr());
 		}
@@ -482,14 +482,14 @@ void photon::pre_tick(int tps) {
 			std::vector<box>* rotated = tmp.hitbox;
 			switch (tmp.type) {
 			case enum_type::MIRROR:
-				rotated += (int)orientation % 8;
+				rotated += (uintptr_t)orientation % 8;
 				break;
 			case enum_type::DIAGONAL_MIRROR:
 			case enum_type::SPLITTER:
-				rotated += ((int)orientation - 2) % 8 == 0 ? 0 : 1;
+				rotated += (uintptr_t)(((int)orientation - 2) % 8 == 0 ? 0 : 1);
 				break;
 			case enum_type::GLASS_BLOCK:
-				rotated += (int)orientation % 8 / 2;
+				rotated += (uintptr_t)((int)orientation % 8 / 2);
 				break;
 			default:
 				break;

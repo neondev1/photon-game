@@ -32,10 +32,15 @@ namespace fs = std::filesystem;
 
 #ifdef _WIN32
 extern "C" {
+#	ifdef __GNUC__
+	__attribute__((dllexport)) unsigned NvOptimusEnablement = 1;
+	__attribute__((dllexport)) unsigned AmdPowerXpressRequestHighPerformance = 1;
+#	elif defined(_MSC_VER) || defined(__clang__)
 	__declspec(dllexport) unsigned NvOptimusEnablement = 1;
 	__declspec(dllexport) unsigned AmdPowerXpressRequestHighPerformance = 1;
+#	endif // __GNUC__, defined(_MSC_VER) || defined(__clang__)
 }
-#endif
+#endif // _WIN32
 
 void move_cb(GLFWwindow* window, double xpos, double ypos);
 void click_cb(GLFWwindow* window, int button, int action, int mods);
@@ -206,6 +211,48 @@ int main(void) {
 				}
 				if (game::level > level) {
 					if (game::level >= res::loader::levels.size()) {
+						game::level--;
+						for (int i = 0; i < 2; i++) {
+							glClear(GL_COLOR_BUFFER_BIT);
+							for (int layer = 0; layer < 7; layer++)
+								for (int i = 0; i < res::objects.size(); i++)
+									res::objects.data()[i].render(layer);
+							for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end(); ++it)
+								it->render();
+							render_bars();
+							render_text(std::string("Time: ") + gui::time(game::time),
+								10, 9, 1260, 2, false, 0, white);
+							std::string fail_str = std::string("Fails: ") + std::to_string(game::failures);
+							render_text(fail_str, 1274 - 18 * (int)fail_str.length(),
+								9, 1260, 2, false, 0, white);
+							render_text(std::string("Level ") + std::to_string(game::level + 1) + std::string("/") + std::to_string(res::loader::levels.size()),
+								10, 689, 1260, 2, false, 0, white);
+							if (game::custom) {
+								std::string name_str = std::string("Map: ") + game::name;
+								render_text(name_str, 1274 - 18 * (int)name_str.length(),
+									689, 1260, 2, false, 0, white);
+							}
+							glfwSwapBuffers(gui::window);
+						}
+						std::this_thread::sleep_for(std::chrono::milliseconds(300));
+						for (int i = 1; i <= 10; i++) {
+							glEnable(GL_SCISSOR_TEST);
+							glScissor(0, 0, 1280, 720);
+							glEnable(GL_BLEND);
+							glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+							glUniform4f(glGetUniformLocation(res::shaders::rectangle, "colour"), 0.0f, 0.0f, 0.0f, i * 0.1f);
+							glUniform1f(glGetUniformLocation(res::shaders::rectangle, "noise"), 0);
+							glUniform1f(glGetUniformLocation(res::shaders::rectangle, "pxsize"), (GLfloat)PX_SIZE);
+							glUseProgram(res::shaders::rectangle);
+							glBindVertexArray(res::rect_vao);
+							glDrawArrays(GL_TRIANGLES, 0, 6);
+							glBindVertexArray(0);
+							glDisable(GL_BLEND);
+							glDisable(GL_SCISSOR_TEST);
+							std::this_thread::sleep_for(std::chrono::milliseconds(50));
+							glfwSwapBuffers(gui::window);
+						}
+						game::level++;
 						photon::deleting.clear();
 						photon::nodes.clear();
 						photon::photons.clear();
@@ -228,9 +275,11 @@ int main(void) {
 						gui::elements.data()[index + 2]->visible = true;
 						gui::menu = true;
 					}
-					std::this_thread::sleep_for(one);
-					glClear(GL_COLOR_BUFFER_BIT);
-					glfwSwapBuffers(gui::window);
+					else {
+						std::this_thread::sleep_for(one);
+						glClear(GL_COLOR_BUFFER_BIT);
+						glfwSwapBuffers(gui::window);
+					}
 					std::this_thread::sleep_for(one);
 					res::loader::load_level(game::level, true);
 					game::frame = -1;
@@ -381,8 +430,8 @@ int main(void) {
 				}
 				else if (game::hint && !res::loader::levels.data()[game::level].hint.empty()) {
 					glClear(GL_COLOR_BUFFER_BIT);
-					render_text(res::loader::levels.data()[game::level].hint, 50, 50, 1180, 3, false, 0, vec(1.0f, 1.0f, 1.0f, 1.0f));
-					render_text("Press any key to dismiss", 50, 648, 1180, 2, false, 0, vec(1.0f, 1.0f, 1.0f, 1.0f));
+					render_text(res::loader::levels.data()[game::level].hint, 50, 50, 1180, 2, false, 0, white);
+					render_text("Press any key to dismiss", 50, 648, 1180, 2, false, 0, white);
 				}
 				else if ((game::frame % 10 - game::frame % 2) && !object::invalidate_all) {
 					for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end(); ++it) {
@@ -483,7 +532,7 @@ int main(void) {
 						for (int i = 0; i < res::objects.size(); i++)
 							res::objects.data()[i].render(layer);
 				}
-				if (!gui::menu) {
+				if (!gui::menu && !game::hint) {
 					if (object::selected) {
 						if (object::selected->linked) {
 							for (int i = 0; i < object::selected->linked->members.size(); i++)

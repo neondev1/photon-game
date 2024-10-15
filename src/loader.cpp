@@ -118,7 +118,7 @@ const rect& res::loader::background(int level) {
 	return r;
 }
 
-void res::loader::set_background(int level, const vec colour, float noise) {
+void res::loader::set_background(int level, const vec& colour, float noise) {
 	object& obj = levels.data()[level].objects.data()[0];
 	std::memcpy(&obj.x1, &colour.r, sizeof(int));
 	std::memcpy(&obj.x2, &colour.g, sizeof(int));
@@ -146,64 +146,77 @@ bool res::loader::load_from_file(std::string path) {
 	std::string name;
 	std::getline(in, name);
 	std::string str;
-	while (std::getline(in, str)) {
-		int x, y, dir;
-		if (str.data()[0] == ' ') {
-			temp.push_back(level());
-			temp.back().hint = str.substr(1);
-			int r, g, b, noise;
-			in >> x >> y >> dir >> r >> g >> b >> noise;
-			if (in.fail() || dir < 0 || dir >= (int)photon::enum_direction::NONE) {
+	try {
+		while (std::getline(in, str)) {
+			int x, y, dir;
+			if (str.data()[0] == ' ') {
+				temp.push_back(level());
+				int hint_length = std::stoi(str.substr(1));
+				for (int i = 0; i < hint_length; i++) {
+					std::string s;
+					std::getline(in, s);
+					temp.back().hint += s;
+					if (i < hint_length - 1)
+						temp.back().hint += '\n';
+				}
+				int r, g, b, noise;
+				in >> x >> y >> dir >> r >> g >> b >> noise;
+				if (in.fail() || dir < 0 || dir >= (int)photon::enum_direction::NONE) {
+					in.close();
+					return false;
+				}
+				temp.back().objects.push_back(object(x, y, 1, 1,
+					object::enum_orientation::NONE, object::enum_type::NONE, TEX_PHOTON, NULL, dir, false));
+				temp.back().objects.back().x1 = r;
+				temp.back().objects.back().x2 = g;
+				temp.back().objects.back().y1 = b;
+				temp.back().objects.back().y2 = noise;
+				temp.back().objects.push_back(object(0.0, 0.0, 640, 360,
+					object::enum_orientation::NONE, object::enum_type::NONE, NULL, NULL, 0, false));
+				std::getline(in, str);
+				continue;
+			}
+			int type, randomize;
+			std::istringstream iss(str);
+			iss >> type >> x >> y >> dir >> randomize;
+			if (iss.fail() || type < 0 || type >(int)object::enum_type::NONE
+				|| dir < 0 || dir >(int)object::enum_orientation::NONE) {
 				in.close();
 				return false;
 			}
-			temp.back().objects.push_back(object(x, y, 1, 1,
-				object::enum_orientation::NONE, object::enum_type::NONE, TEX_PHOTON, NULL, dir, false));
-			temp.back().objects.back().x1 = r;
-			temp.back().objects.back().x2 = g;
-			temp.back().objects.back().y1 = b;
-			temp.back().objects.back().y2 = noise;
-			temp.back().objects.push_back(object(0.0, 0.0, 640, 360,
-				object::enum_orientation::NONE, object::enum_type::NONE, NULL, NULL, 0, false));
-			std::getline(in, str);
-			continue;
-		}
-		int type, randomize;
-		std::istringstream iss(str);
-		iss >> type >> x >> y >> dir >> randomize;
-		if (iss.fail() || type < 0 || type > (int)object::enum_type::NONE
-			|| dir < 0 || dir > (int)object::enum_orientation::NONE) {
-			in.close();
-			return false;
-		}
-		object::enum_type t = (object::enum_type)type;
-		temp.back().objects.push_back(object(x, y, 20, 20,
-			(object::enum_orientation)dir, t,
-			res::loader::get_tex(t), res::loader::get_hbx(t),
-			0, randomize != 0));
-		if (t == object::enum_type::MOVING_WALL
-			|| t == object::enum_type::MOVING_BLOCK
-			|| t == object::enum_type::MOVING_CRYSTAL) {
-			int x2, y2, data;
-			iss >> x2 >> y2 >> data;
-			if (iss.fail() || data < 0) {
-				in.close();
-				return false;
+			object::enum_type t = (object::enum_type)type;
+			temp.back().objects.push_back(object(x, y, 20, 20,
+				(object::enum_orientation)dir, t,
+				res::loader::get_tex(t), res::loader::get_hbx(t),
+				0, randomize != 0));
+			if (t == object::enum_type::MOVING_WALL
+				|| t == object::enum_type::MOVING_BLOCK
+				|| t == object::enum_type::MOVING_CRYSTAL) {
+				int x2, y2, data;
+				iss >> x2 >> y2 >> data;
+				if (iss.fail() || data < 0) {
+					in.close();
+					return false;
+				}
+				temp.back().objects.back().x2 = x2;
+				temp.back().objects.back().y2 = y2;
+				temp.back().objects.back().data = data;
 			}
-			temp.back().objects.back().x2 = x2;
-			temp.back().objects.back().y2 = y2;
-			temp.back().objects.back().data = data;
-		}
-		if (t == object::enum_type::DOOR
-			|| t == object::enum_type::MIRROR_DOOR) {
-			int data;
-			iss >> data;
-			if (iss.fail() || data < 0) {
-				in.close();
-				return false;
+			if (t == object::enum_type::DOOR
+				|| t == object::enum_type::MIRROR_DOOR) {
+				int data;
+				iss >> data;
+				if (iss.fail() || data < 0) {
+					in.close();
+					return false;
+				}
+				temp.back().objects.back().data = data;
 			}
-			temp.back().objects.back().data = data;
 		}
+	}
+	catch (...) {
+		in.close();
+		return false;
 	}
 	in.close();
 	levels.clear();
