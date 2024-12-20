@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <thread>
@@ -25,20 +26,19 @@
 #include <GLFW/glfw3.h>
 
 #include "head.hpp"
-
 #include "gui.hpp"
 
 namespace fs = std::filesystem;
 
 #ifdef _WIN32
 extern "C" {
-#	ifdef __GNUC__
-	__attribute__((dllexport)) unsigned NvOptimusEnablement = 1;
-	__attribute__((dllexport)) unsigned AmdPowerXpressRequestHighPerformance = 1;
-#	elif defined(_MSC_VER) || defined(__clang__)
+#	ifdef _MSC_VER
 	__declspec(dllexport) unsigned NvOptimusEnablement = 1;
 	__declspec(dllexport) unsigned AmdPowerXpressRequestHighPerformance = 1;
-#	endif // __GNUC__, defined(_MSC_VER) || defined(__clang__)
+#	elif defined(__GNUC__) || defined(__clang__)
+	__attribute__((dllexport)) unsigned NvOptimusEnablement = 1;
+	__attribute__((dllexport)) unsigned AmdPowerXpressRequestHighPerformance = 1;
+#	endif // _MSC_VER, defined(__GNUC__) || defined(__clang__)
 }
 #endif // _WIN32
 
@@ -55,10 +55,9 @@ static bool list_nodes(node* root, int depth);
 long long game::frame = -1;
 
 int main(void) {
-	srand((unsigned)time(NULL));
 	if (!glfwInit()) {
 #ifdef _WIN32
-		MessageBoxA(NULL, "Failed to initialize GLFW", "", MB_OK | MB_ICONERROR);
+		MessageBoxA(nullptr, "Failed to initialize GLFW", "", MB_OK | MB_ICONERROR);
 #endif // _WIN32
 		exit(EXIT_FAILURE);
 	}
@@ -66,11 +65,11 @@ int main(void) {
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
-	gui::window = glfwCreateWindow(1280, 720, "Photon", NULL, NULL);
-	if (gui::window == NULL) {
+	gui::window = glfwCreateWindow(1280, 720, "Photon", nullptr, nullptr);
+	if (gui::window == nullptr) {
 		glfwTerminate();
 #ifdef _WIN32
-		MessageBoxA(NULL, "Failed to create window", "", MB_OK | MB_ICONERROR);
+		MessageBoxA(nullptr, "Failed to create window", "", MB_OK | MB_ICONERROR);
 #endif // _WIN32
 		exit(EXIT_FAILURE);
 	}
@@ -79,7 +78,7 @@ int main(void) {
 		glfwDestroyWindow(gui::window);
 		glfwTerminate();
 #ifdef _WIN32
-		MessageBoxA(NULL, "Failed to load glad", "", MB_OK | MB_ICONERROR);
+		MessageBoxA(nullptr, "Failed to load OpenGL", "", MB_OK | MB_ICONERROR);
 #endif // _WIN32
 		exit(EXIT_FAILURE);
 	}
@@ -138,11 +137,11 @@ int main(void) {
 			[](char c) { return std::tolower(c); });
 		int fails = game::failures;
 		if (s == "add")
-			photon::photons.push_back(photon(NULL, 0.0, 0.0, photon::enum_direction::E, 0, 0, NULL));
+			photon::photons.push_back(photon(nullptr, 0.0, 0.0, photon::enum_direction::E, 0, 0, nullptr));
 		else if (!photon::photons.empty()) {
 			int id = 0;
 			std::cin >> id;
-			photon* p = NULL;
+			photon* p = nullptr;
 			std::list<photon>::iterator it = photon::photons.begin();
 			for (; it != photon::photons.end(); ++it) {
 				if (it->id == id) {
@@ -159,13 +158,13 @@ int main(void) {
 			object wall = object();
 			wall.type = object::enum_type::WALL;
 			if (s == "spdc")
-				interact(p, 0, &spdc, NULL, 0, tps, &it);
+				interact(p, 0, &spdc, nullptr, 0, tps, &it);
 			else if (s == "split")
-				interact(p, 0, &split, NULL, 0, tps, &it);
+				interact(p, 0, &split, nullptr, 0, tps, &it);
 			else if (s == "bomb")
-				interact(p, 0, &bomb, NULL, 0, tps, &it);
+				interact(p, 0, &bomb, nullptr, 0, tps, &it);
 			else if (s == "wall")
-				interact(p, 0, &wall, NULL, 0, tps, &it);
+				interact(p, 0, &wall, nullptr, 0, tps, &it);
 			if (photon::deleting.size() > 0) {
 				for (std::list<node>::iterator it = photon::nodes.begin(); it != photon::nodes.end();) {
 					node* n = &*it;
@@ -180,7 +179,7 @@ int main(void) {
 		}
 		if (game::failures > fails)
 			std::cout << "Fail" << std::endl;
-		list_nodes(NULL, 0);
+		list_nodes(nullptr, 0);
 	}
 #	endif // LOGIC_TEST
 #endif // _DEBUG
@@ -244,7 +243,7 @@ int main(void) {
 							glUniform1f(glGetUniformLocation(res::shaders::rectangle, "noise"), 0);
 							glUniform1f(glGetUniformLocation(res::shaders::rectangle, "pxsize"), (GLfloat)PX_SIZE);
 							glUseProgram(res::shaders::rectangle);
-							glBindVertexArray(res::rect_vao);
+							glBindVertexArray(res::vao);
 							glDrawArrays(GL_TRIANGLES, 0, 6);
 							glBindVertexArray(0);
 							glDisable(GL_BLEND);
@@ -256,7 +255,7 @@ int main(void) {
 						photon::deleting.clear();
 						photon::nodes.clear();
 						photon::photons.clear();
-						object::selected = NULL;
+						object::selected = nullptr;
 						object::invalidated.clear();
 						object::temp_tex.clear();
 						res::objects.clear();
@@ -342,7 +341,7 @@ int main(void) {
 						glfwSwapBuffers(gui::window);
 					}
 					for (int i = 3; i <= 10; i++) {
-						game::reason->render(-2, i);
+						object::reason->render(-2, i);
 						std::this_thread::sleep_for(std::chrono::milliseconds(30));
 						glfwSwapBuffers(gui::window);
 					}
@@ -356,7 +355,7 @@ int main(void) {
 						glUniform1f(glGetUniformLocation(res::shaders::rectangle, "noise"), 0);
 						glUniform1f(glGetUniformLocation(res::shaders::rectangle, "pxsize"), (GLfloat)PX_SIZE);
 						glUseProgram(res::shaders::rectangle);
-						glBindVertexArray(res::rect_vao);
+						glBindVertexArray(res::vao);
 						glDrawArrays(GL_TRIANGLES, 0, 6);
 						glBindVertexArray(0);
 						glDisable(GL_BLEND);
@@ -368,10 +367,11 @@ int main(void) {
 					photon::deleting.clear();
 					photon::nodes.clear();
 					photon::photons.clear();
-					object::selected = NULL;
+					object::selected = nullptr;
 					object::invalidated.clear();
 					object::temp_tex.clear();
 					res::objects.clear();
+					game::failures = -1;
 					std::ofstream out(game::save, std::ios::trunc);
 					out << (game::hardcore ? 'h' : 'n') << '\n' << game::level << '\n';
 					out << game::failures << '\n' << game::time << std::endl;
@@ -411,7 +411,7 @@ int main(void) {
 						glfwSwapBuffers(gui::window);
 					}
 					for (int i = 1; i <= 5; i++) {
-						game::reason->render(-2, i);
+						object::reason->render(-2, i);
 						std::this_thread::sleep_for(std::chrono::milliseconds(30));
 						glfwSwapBuffers(gui::window);
 					}
@@ -419,7 +419,7 @@ int main(void) {
 					res::loader::load_level(game::level, true);
 					game::frame = -1;
 				}
-				game::reason = NULL;
+				object::reason = nullptr;
 			}
 			if (cur < next || skipped > 5) {
 				game::frame++;
@@ -448,7 +448,7 @@ int main(void) {
 							(GLfloat)res::objects.data()[0].offset,
 							(GLfloat)res::objects.data()[0].offset);
 						glUseProgram(res::shaders::rectangle);
-						glBindVertexArray(res::rect_vao);
+						glBindVertexArray(res::vao);
 						glDrawArrays(GL_TRIANGLES, 0, 6);
 						glBindVertexArray(0);
 						glDisable(GL_SCISSOR_TEST);
@@ -751,10 +751,10 @@ static bool list_nodes(node* root, int depth) {
 	}
 	else {
 		for (std::list<photon>::iterator it = photon::photons.begin(); it != photon::photons.end(); ++it)
-			if (it->parent == NULL)
+			if (it->parent == nullptr)
 				items.push_back(&*it);
 		for (std::list<node>::iterator it = photon::nodes.begin(); it != photon::nodes.end(); ++it)
-			if (it->parent == NULL)
+			if (it->parent == nullptr)
 				children.push_back(&*it);
 	}
 	for (int i = 0; i < depth; i++)

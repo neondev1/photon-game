@@ -34,22 +34,22 @@ namespace res::loader {
 #define TEX_BOMB    	TEX(29)
 #define TEX_SENSOR  	TEX(31)
 
-#define HBX_WALL    	NULL
-#define HBX_DOOR    	NULL
-#define HBX_MOV_WALL	NULL
+#define HBX_WALL    	nullptr
+#define HBX_DOOR    	nullptr
+#define HBX_MOV_WALL	nullptr
 #define HBX_ROT_MIRROR	HBX(0)
 #define HBX_DMIRROR 	HBX(8)
-#define HBX_MIRRORBLOCK	NULL
-#define HBX_MIRRORDOOR	NULL
+#define HBX_MIRRORBLOCK	nullptr
+#define HBX_MIRRORDOOR	nullptr
 #define HBX_ROT_BLOCK	HBX(10)
-#define HBX_FBLOCK  	NULL
-#define HBX_MOV_BLOCK	NULL
+#define HBX_FBLOCK  	nullptr
+#define HBX_MOV_BLOCK	nullptr
 #define HBX_PRISM   	HBX(14)
-#define HBX_SPDC    	NULL
-#define HBX_MOV_SPDC	NULL
+#define HBX_SPDC    	nullptr
+#define HBX_MOV_SPDC	nullptr
 #define HBX_SPLITTER	HBX(15)
-#define HBX_BOMB    	NULL
-#define HBX_SENSOR  	NULL
+#define HBX_BOMB    	nullptr
+#define HBX_SENSOR  	nullptr
 
 std::vector<rect>* res::loader::get_tex(object::enum_type type) {
 	switch (type) {
@@ -68,7 +68,7 @@ std::vector<rect>* res::loader::get_tex(object::enum_type type) {
 	case object::enum_type::MIRROR_DOOR:
 		return TEX_MIRRORDOOR;
 	case object::enum_type::GLASS_BLOCK:
-		return TEX_ROT_MIRROR;
+		return TEX_ROT_BLOCK;
 	case object::enum_type::FIXED_BLOCK:
 		return TEX_FBLOCK;
 	case object::enum_type::MOVING_BLOCK:
@@ -86,7 +86,7 @@ std::vector<rect>* res::loader::get_tex(object::enum_type type) {
 	case object::enum_type::SENSOR:
 		return TEX_SENSOR;
 	default:
-		return NULL;
+		return nullptr;
 	}
 }
 
@@ -103,7 +103,7 @@ std::vector<box>* res::loader::get_hbx(object::enum_type type) {
 	case object::enum_type::SPLITTER:
 		return HBX_SPLITTER;
 	default:
-		return NULL;
+		return nullptr;
 	}
 }
 
@@ -130,10 +130,10 @@ void res::loader::load_default(void) {
 	levels.clear();
 	levels.push_back(level());
 	levels.back().objects.push_back(object(0.0, 0.0, 1, 1,
-		object::enum_orientation::NONE, object::enum_type::NONE, TEX_PHOTON, NULL,
+		object::enum_orientation::NONE, object::enum_type::NONE, TEX_PHOTON, nullptr,
 		(int)photon::enum_direction::E, false));
 	levels.back().objects.push_back(object(0.0, 0.0, 640, 360,
-		object::enum_orientation::NONE, object::enum_type::NONE, NULL, NULL, 0, false));
+		object::enum_orientation::NONE, object::enum_type::NONE, nullptr, nullptr, 0, false));
 	for (int i = 0; i < levels.size(); i++)
 		set_background(i, object::default_colour, object::default_noise);
 }
@@ -166,26 +166,26 @@ bool res::loader::load_from_file(std::string path) {
 					return false;
 				}
 				temp.back().objects.push_back(object(x, y, 1, 1,
-					object::enum_orientation::NONE, object::enum_type::NONE, TEX_PHOTON, NULL, dir, false));
+					object::enum_orientation::NONE, object::enum_type::NONE, TEX_PHOTON, nullptr, dir, false));
 				temp.back().objects.back().x1 = r;
 				temp.back().objects.back().x2 = g;
 				temp.back().objects.back().y1 = b;
 				temp.back().objects.back().y2 = noise;
 				temp.back().objects.push_back(object(0.0, 0.0, 640, 360,
-					object::enum_orientation::NONE, object::enum_type::NONE, NULL, NULL, 0, false));
+					object::enum_orientation::NONE, object::enum_type::NONE, nullptr, nullptr, 0, false));
 				std::getline(in, str);
 				continue;
 			}
-			int type, randomize;
+			int type, width, height, randomize;
 			std::istringstream iss(str);
-			iss >> type >> x >> y >> dir >> randomize;
-			if (iss.fail() || type < 0 || type >(int)object::enum_type::NONE
+			iss >> type >> x >> y >> width >> height >> dir >> randomize;
+			if (iss.fail() || type < 0 || type > (int)object::enum_type::NONE
 				|| dir < 0 || dir >(int)object::enum_orientation::NONE) {
 				in.close();
 				return false;
 			}
 			object::enum_type t = (object::enum_type)type;
-			temp.back().objects.push_back(object(x, y, 20, 20,
+			temp.back().objects.push_back(object(x, y, width, height,
 				(object::enum_orientation)dir, t,
 				res::loader::get_tex(t), res::loader::get_hbx(t),
 				0, randomize != 0));
@@ -204,12 +204,13 @@ bool res::loader::load_from_file(std::string path) {
 			}
 			if (t == object::enum_type::DOOR
 				|| t == object::enum_type::MIRROR_DOOR) {
-				int data;
-				iss >> data;
+				int toggle, data;
+				iss >> toggle >> data;
 				if (iss.fail() || data < 0) {
 					in.close();
 					return false;
 				}
+				temp.back().objects.back().toggle = toggle != 0;
 				temp.back().objects.back().data = data;
 			}
 		}
@@ -236,7 +237,7 @@ void res::loader::load_level(int level, bool randomize_orientation) {
 	photon::photons.clear();
 	object::invalidated.clear();
 	object::temp_tex.clear();
-	object::selected = NULL;
+	object::selected = nullptr;
 	res::objects.clear();
 	res::objects.resize(res::loader::levels[level].objects.size() - 1);
 	std::memcpy(res::objects.data(),
@@ -247,7 +248,7 @@ void res::loader::load_level(int level, bool randomize_orientation) {
 	photon::photons.push_back(photon(
 		TEX_PHOTON, p_x, p_y,
 		(photon::enum_direction)res::loader::levels.data()[level].objects.data()[0].data,
-		0, 0, NULL
+		0, 0, nullptr
 	));
 	game::sensors = 0;
 	object::groups.clear();
@@ -308,7 +309,6 @@ namespace game {
 	bool hardcore = false;
 	int level = 0;
 	int failures = 0;
-	object* reason;
 	int sensors = 0;
 	int activated = 0;
 	double time = 0.0;

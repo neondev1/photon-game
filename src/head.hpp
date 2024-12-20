@@ -8,6 +8,7 @@
 #include <vector>
 
 #include <cmath>
+#include <cstdint>
 #include <string>
 
 #include <glad/glad.h>
@@ -22,11 +23,11 @@ struct vec {
 	union { float z, b, p; };
 	union { float w, a, q; };
 
-	inline vec(void) : x(0.0f), y(0.0f), z(0.0f), w(0.0f) {}
-	inline vec(float x, float y, float z, float w) :
+	constexpr vec(void) : x(0.0f), y(0.0f), z(0.0f), w(0.0f) {}
+	constexpr vec(float x, float y, float z, float w) :
 		x(x), y(y), z(z), w(w) {}
 
-	inline float const* ptr(void) const { return &x; }
+	constexpr float const* ptr(void) const { return &x; }
 };
 
 inline bool operator==(const vec& left, const vec& right) {
@@ -60,6 +61,7 @@ public:
 
 	static object* selected;
 	static object* previous;
+	static object* reason;
 	static std::list<group> groups;
 	static bool invalidate_all;
 	static std::unordered_set<object*> invalidated;
@@ -111,7 +113,10 @@ class group {
 public:
 	std::vector<object*> members;
 
-	void add(object* obj);
+	inline void add(object* obj) {
+		members.push_back(obj);
+		obj->linked = this;
+	}
 };
 
 class node;
@@ -181,6 +186,7 @@ public:
 	void destroy(void);
 };
 
+// Stores certain things related to game state
 namespace game {
 	extern bool started;
 	extern bool hint;
@@ -188,7 +194,6 @@ namespace game {
 	extern bool hardcore;
 	extern int level;
 	extern int failures;
-	extern object* reason;
 	extern int sensors;
 	extern int activated;
 	extern double time;
@@ -198,7 +203,7 @@ namespace game {
 }
 
 namespace res {
-	extern GLuint rect_vao;
+	extern GLuint vao;
 	extern std::vector<object> objects;
 	namespace shaders {
 		extern GLuint rectangle;
@@ -247,8 +252,8 @@ void select(int key);
 void render_bars(void);
 void render_text(std::string text, int x, int y, int width, int size, bool cursor, size_t cursor_pos, vec colour);
 
-unsigned mix32_rand(void);
-unsigned mix32_rand(unsigned n);
+uint32_t mix32_rand(void);
+uint32_t mix32_rand(uint32_t n);
 
 inline double distance(double x1, double y1, double x2, double y2) {
 	return std::sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));

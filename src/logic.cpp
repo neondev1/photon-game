@@ -17,17 +17,17 @@ static bool search_nodes(node* root, std::function<bool(photon*)> predicate) {
 
 double intersect(double x1, double y1, double x2, double y2,
 	double x3, double y3, double x4, double y4) {
-	double x00 = x1, y00 = y1;
-	double x01 = x2 - x1, y01 = y2 - y1;
-	double x10 = x3, y10 = y3;
-	double x11 = x4 - x3, y11 = y4 - y3;
-	double d = x11 * y01 - x01 * y11;
+	double x11 = x1, y11 = y1;
+	double x12 = x2 - x1, y12 = y2 - y1;
+	double x21 = x3, y21 = y3;
+	double x22 = x4 - x3, y22 = y4 - y3;
+	double d = x22 * y12 - x12 * y22;
 	if (d == 0.0)
 		return 2.0;
-	double s = ((x00 - x10) * y01 - (y00 - y10) * x01) / d;
+	double s = ((x11 - x21) * y12 - (y11 - y21) * x12) / d;
 	if (s > 1.0 || s < 0.0)
 		return 2.0;
-	double t = ((x00 - x10) * y11 - (y00 - y10) * x11) / d;
+	double t = ((x11 - x21) * y22 - (y11 - y21) * x22) / d;
 	return (t >= 0.0 && t <= 1.0) ? t : 2.0;
 }
 
@@ -74,35 +74,32 @@ bool interact(photon* const p, double dist, object* const obj,
 		}
 		break;
 	case object::enum_type::DOOR:
-		if (!obj->toggle) {
-			p->direction = photon::enum_direction::NONE;
-			if (p->parent == NULL)
-				p->destroy();
-			else if (p->parent->type == node::enum_node::SPDC) {
-				node* n = p->parent;
-				p->destroy();
-				*iter = photon::photons.erase(*iter);
-				if (n->children.empty() && n->items.size() == 1) {
-					node::move(n->items.front(), n->parent);
-					n->destroy();
-					photon::deleting.insert(n);
-				}
-				else if (n->items.empty() && n->children.size() == 1) {
-					node::move(n->children.front(), n->parent);
-					n->destroy();
-					photon::deleting.insert(n);
-				}
-				return true;
+		p->direction = photon::enum_direction::NONE;
+		if (p->parent == nullptr)
+			p->destroy();
+		else if (p->parent->type == node::enum_node::SPDC) {
+			node* n = p->parent;
+			p->destroy();
+			*iter = photon::photons.erase(*iter);
+			if (n->children.empty() && n->items.size() == 1) {
+				node::move(n->items.front(), n->parent);
+				n->destroy();
+				photon::deleting.insert(n);
 			}
+			else if (n->items.empty() && n->children.size() == 1) {
+				node::move(n->children.front(), n->parent);
+				n->destroy();
+				photon::deleting.insert(n);
+			}
+			return true;
 		}
 		break;
 	case object::enum_type::MIRROR_DOOR:
-		if (obj->toggle)
-			break;
+		tmp.orientation = (line % 2) ? object::enum_orientation::N : object::enum_orientation::E;
 		[[fallthrough]];
 	case object::enum_type::MIRROR:
 	case object::enum_type::DIAGONAL_MIRROR: {
-		int reflected = 3 * ((int)obj->orientation % 8) - (int)p->direction;
+		int reflected = 3 * ((int)tmp.orientation % 8) - (int)p->direction;
 		if (reflected < 0)
 			reflected += 24;
 		p->direction = (photon::enum_direction)reflected;
@@ -155,7 +152,7 @@ bool interact(photon* const p, double dist, object* const obj,
 			if (distance(intersect_x + p->vel(tps) * std::cos(heading), intersect_y + p->vel(tps) * std::sin(heading), p->_x, p->_y) <
 				distance(intersect_x + p->vel(tps) * std::cos(heading2), intersect_y + p->vel(tps) * std::sin(heading2), p->_x, p->_y))
 				heading = heading2;
-			photon tp = photon(NULL, 0.0, 0.0, photon::enum_direction::NONE, 0, 0, NULL);
+			photon tp = photon(nullptr, 0.0, 0.0, photon::enum_direction::NONE, 0, 0, nullptr);
 			photon::enum_direction best = (photon::enum_direction)0;
 			double diff = 2 * PI;
 			for (int i = 0; i < (int)photon::enum_direction::NONE; i++) {
@@ -166,11 +163,11 @@ bool interact(photon* const p, double dist, object* const obj,
 				}
 			}
 			p->direction = best;
-			p->medium = p->medium == obj ? NULL : obj;
+			p->medium = p->medium == obj ? nullptr : obj;
 		}
 		else {
 			p->direction = photon::enum_direction::NONE;
-			if (p->parent == NULL)
+			if (p->parent == nullptr)
 				p->destroy();
 			else if (p->parent->type == node::enum_node::SPDC) {
 				node* n = p->parent;
@@ -227,7 +224,7 @@ bool interact(photon* const p, double dist, object* const obj,
 		if (distance(intersect_x + p->vel(tps) * std::cos(heading), intersect_y + p->vel(tps) * std::sin(heading), p->_x, p->_y) <
 			distance(intersect_x + p->vel(tps) * std::cos(heading2), intersect_y + p->vel(tps) * std::sin(heading2), p->_x, p->_y))
 			heading = heading2;
-		photon tp = photon(NULL, 0.0, 0.0, photon::enum_direction::NONE, 0, 0, NULL);
+		photon tp = photon(nullptr, 0.0, 0.0, photon::enum_direction::NONE, 0, 0, nullptr);
 		photon::enum_direction best = (photon::enum_direction)0;
 		double diff = 2 * PI;
 		for (int i = 0; i < (int)photon::enum_direction::NONE; i++) {
@@ -238,7 +235,7 @@ bool interact(photon* const p, double dist, object* const obj,
 			}
 		}
 		p->direction = best;
-		p->medium = p->medium == obj ? NULL : obj;
+		p->medium = p->medium == obj ? nullptr : obj;
 		break;
 	}
 	case object::enum_type::PRISM: {
@@ -280,7 +277,7 @@ bool interact(photon* const p, double dist, object* const obj,
 		if (distance(intersect_x + p->vel(tps) * std::cos(heading), intersect_y + p->vel(tps) * std::sin(heading), p->_x, p->_y) <
 			distance(intersect_x + p->vel(tps) * std::cos(heading2), intersect_y + p->vel(tps) * std::sin(heading2), p->_x, p->_y))
 			heading = heading2;
-		photon tp = photon(NULL, 0.0, 0.0, photon::enum_direction::NONE, 0, 0, NULL);
+		photon tp = photon(nullptr, 0.0, 0.0, photon::enum_direction::NONE, 0, 0, nullptr);
 		photon::enum_direction best = (photon::enum_direction)0;
 		double diff = 2 * PI;
 		for (int i = 0; i < (int)photon::enum_direction::NONE; i++) {
@@ -291,14 +288,14 @@ bool interact(photon* const p, double dist, object* const obj,
 			}
 		}
 		p->direction = best;
-		p->medium = p->medium == obj ? NULL : obj;
+		p->medium = p->medium == obj ? nullptr : obj;
 		break;
 	}
 	case object::enum_type::SPLITTER: {
 		p->split++;
 		node* n;
 		if (!p->parent) {
-			photon::nodes.push_back(node(NULL, node::enum_node::SUPERPOS));
+			photon::nodes.push_back(node(nullptr, node::enum_node::SUPERPOS));
 			n = &photon::nodes.back();
 			node::move(p, n);
 		}
@@ -323,14 +320,14 @@ bool interact(photon* const p, double dist, object* const obj,
 			p->medium = obj;
 		else {
 #endif // LOGIC_TEST
-			p->medium = NULL;
+			p->medium = nullptr;
 			p->dc++;
 			int dir = (int)p->direction;
 			photon::enum_direction dir1 = (photon::enum_direction)(dir == 0 ? 23 : dir - 1);
 			photon::enum_direction dir2 = (photon::enum_direction)(dir == 23 ? 0 : dir + 1);
 			node* n;
 			if (!p->parent)
-				n = NULL;
+				n = nullptr;
 			else if (p->parent->type != node::enum_node::SPDC) {
 				n = p->parent->add(node::enum_node::SPDC);
 				node::move(p, n);
@@ -350,7 +347,7 @@ bool interact(photon* const p, double dist, object* const obj,
 		break;
 	}
 	case object::enum_type::BOMB: {
-		game::reason = obj;
+		object::reason = obj;
 		node* n = p->parent;
 		if (!n)
 			game::failures++;
@@ -553,15 +550,15 @@ bool interact(photon* const p, double dist, object* const obj,
 }
 
 void select(int key) {
-	if (object::selected == NULL)
+	if (object::selected == nullptr)
 		return;
 	object::previous = object::selected;
-	object* best = NULL;
+	object* best = nullptr;
 	static constexpr object::enum_type unselectables[] = {
 		object::enum_type::WALL,
 		object::enum_type::DIAGONAL_MIRROR, object::enum_type::MIRROR_BLOCK,
 		object::enum_type::FIXED_BLOCK, object::enum_type::PRISM,
-		object::enum_type::SPDC_CRYSTAL,
+		object::enum_type::SPDC_CRYSTAL, object::enum_type::SPLITTER,
 		object::enum_type::BOMB, object::enum_type::SENSOR,
 		object::enum_type::NONE
 	};
@@ -577,7 +574,7 @@ void select(int key) {
 			if (obj->midy() - object::selected->midy()
 				< labs(obj->midx() - object::selected->midx()))
 				continue;
-			if (best == NULL)
+			if (best == nullptr)
 				best = obj;
 			else if (obj->midy() < best->midy())
 				best = obj;
@@ -586,14 +583,14 @@ void select(int key) {
 				< labs(best->midx() - object::selected->midx()))
 				best = obj;
 		}
-		if (best == NULL) {
+		if (best == nullptr) {
 			for (int i = 0; i < res::objects.size(); i++) {
 				object* obj = &res::objects.data()[i];
 				if (std::find(unselectables, end, obj->type) != end)
 					continue;
 				if (obj->midy() <= object::selected->midy())
 					continue;
-				if (best == NULL)
+				if (best == nullptr)
 					best = obj;
 				else if (labs(obj->midx() - object::selected->midx()) - (obj->midy() - object::selected->midy())
 					< labs(best->midx() - object::selected->midx()) - (best->midy() - object::selected->midy()))
@@ -615,7 +612,7 @@ void select(int key) {
 			if (object::selected->midx() - obj->midx()
 				< labs(obj->midy() - object::selected->midy()))
 				continue;
-			if (best == NULL)
+			if (best == nullptr)
 				best = obj;
 			else if (obj->midx() > best->midx())
 				best = obj;
@@ -624,14 +621,14 @@ void select(int key) {
 				< labs(best->midy() - object::selected->midy()))
 				best = obj;
 		}
-		if (best == NULL) {
+		if (best == nullptr) {
 			for (int i = 0; i < res::objects.size(); i++) {
 				object* obj = &res::objects.data()[i];
 				if (std::find(unselectables, end, obj->type) != end)
 					continue;
 				if (obj->midx() >= object::selected->midx())
 					continue;
-				if (best == NULL)
+				if (best == nullptr)
 					best = obj;
 				else if (labs(obj->midy() - object::selected->midy()) - (object::selected->midx() - obj->midx())
 					< labs(best->midy() - object::selected->midy()) - (object::selected->midx() - best->midx()))
@@ -653,7 +650,7 @@ void select(int key) {
 			if (object::selected->midy() - obj->midy()
 				< labs(obj->midx() - object::selected->midx()))
 				continue;
-			if (best == NULL)
+			if (best == nullptr)
 				best = obj;
 			else if (obj->midy() > best->midy())
 				best = obj;
@@ -662,14 +659,14 @@ void select(int key) {
 				< labs(best->midx() - object::selected->midx()))
 				best = obj;
 		}
-		if (best == NULL) {
+		if (best == nullptr) {
 			for (int i = 0; i < res::objects.size(); i++) {
 				object* obj = &res::objects.data()[i];
 				if (std::find(unselectables, end, obj->type) != end)
 					continue;
 				if (obj->midy() >= object::selected->midy())
 					continue;
-				if (best == NULL)
+				if (best == nullptr)
 					best = obj;
 				else if (labs(obj->midx() - object::selected->midx()) - (object::selected->midy() - obj->midy())
 					< labs(best->midx() - object::selected->midx()) - (object::selected->midy() - best->midy()))
@@ -691,7 +688,7 @@ void select(int key) {
 			if (obj->midx() - object::selected->midx()
 				< labs(obj->midy() - object::selected->midy()))
 				continue;
-			if (best == NULL)
+			if (best == nullptr)
 				best = obj;
 			else if (obj->midx() < best->midx())
 				best = obj;
@@ -700,14 +697,14 @@ void select(int key) {
 				< labs(best->midy() - object::selected->midy()))
 				best = obj;
 		}
-		if (best == NULL) {
+		if (best == nullptr) {
 			for (int i = 0; i < res::objects.size(); i++) {
 				object* obj = &res::objects.data()[i];
 				if (std::find(unselectables, end, obj->type) != end)
 					continue;
 				if (obj->midx() <= object::selected->midx())
 					continue;
-				if (best == NULL)
+				if (best == nullptr)
 					best = obj;
 				else if (labs(obj->midy() - object::selected->midy()) - (obj->midx() - object::selected->midx())
 					< labs(best->midy() - object::selected->midy()) - (best->midx() - object::selected->midx()))
@@ -719,6 +716,6 @@ void select(int key) {
 			}
 		}
 	}
-	if (best != NULL)
+	if (best != nullptr)
 		object::selected = best;
 }

@@ -1,9 +1,9 @@
-// If you want to use the editor, compile the
-// project using the EditorRelease configuration
+// If you want to use the editor, compile the project using the EditorRelease configuration
 
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <stack>
 #include <thread>
 
 #ifdef _WIN32
@@ -46,34 +46,34 @@
 #define TEX_BOMB    	TEX(29)
 #define TEX_SENSOR  	TEX(31)
 
-#define HBX_WALL    	NULL
-#define HBX_DOOR    	NULL
-#define HBX_MOV_WALL	NULL
+#define HBX_WALL    	nullptr
+#define HBX_DOOR    	nullptr
+#define HBX_MOV_WALL	nullptr
 #define HBX_ROT_MIRROR	HBX(0)
 #define HBX_DMIRROR 	HBX(8)
-#define HBX_MIRRORBLOCK	NULL
-#define HBX_MIRRORDOOR	NULL
+#define HBX_MIRRORBLOCK	nullptr
+#define HBX_MIRRORDOOR	nullptr
 #define HBX_ROT_BLOCK	HBX(10)
-#define HBX_FBLOCK  	NULL
-#define HBX_MOV_BLOCK	NULL
+#define HBX_FBLOCK  	nullptr
+#define HBX_MOV_BLOCK	nullptr
 #define HBX_PRISM   	HBX(14)
-#define HBX_SPDC    	NULL
-#define HBX_MOV_SPDC	NULL
+#define HBX_SPDC    	nullptr
+#define HBX_MOV_SPDC	nullptr
 #define HBX_SPLITTER	HBX(15)
-#define HBX_BOMB    	NULL
-#define HBX_SENSOR  	NULL
+#define HBX_BOMB    	nullptr
+#define HBX_SENSOR  	nullptr
 
 namespace fs = std::filesystem;
 
 #ifdef _WIN32
 extern "C" {
-#	ifdef __GNUC__
-	__attribute__((dllexport)) unsigned NvOptimusEnablement = 1;
-	__attribute__((dllexport)) unsigned AmdPowerXpressRequestHighPerformance = 1;
-#	elif defined(_MSC_VER) || defined(__clang__)
+#	ifdef _MSC_VER
 	__declspec(dllexport) unsigned NvOptimusEnablement = 1;
 	__declspec(dllexport) unsigned AmdPowerXpressRequestHighPerformance = 1;
-#	endif // __GNUC__, defined(_MSC_VER) || defined(__clang__)
+#	elif defined(__GNUC__) || defined(__clang__)
+	__attribute__((dllexport)) unsigned NvOptimusEnablement = 1;
+	__attribute__((dllexport)) unsigned AmdPowerXpressRequestHighPerformance = 1;
+#	endif // _MSC_VER, defined(__GNUC__) || defined(__clang__)
 }
 #endif // _WIN32
 
@@ -84,15 +84,14 @@ static bool command = false;
 long long game::frame = -1;
 
 int main(void) {
-	srand((unsigned)time(NULL));
 #ifdef _WIN32
 	DisableProcessWindowsGhosting();
 #endif // _WIN32
 	if (!glfwInit()) {
 #ifdef _WIN32
-		MessageBoxA(NULL, "Failed to initialize GLFW", "", MB_OK | MB_ICONERROR);
+		MessageBoxA(nullptr, "Failed to initialize GLFW", "", MB_OK | MB_ICONERROR);
 #else
-		std::cout << "Failed to initialize GLFW" << std::endl;
+		std::cerr << "Failed to initialize GLFW" << std::endl;
 #endif // _WIN32
 		return EXIT_FAILURE;
 	}
@@ -100,13 +99,13 @@ int main(void) {
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
-	GLFWwindow* window = glfwCreateWindow(1280, 720, "Photon", NULL, NULL);
-	if (window == NULL) {
+	GLFWwindow* window = glfwCreateWindow(1280, 720, "Photon", nullptr, nullptr);
+	if (window == nullptr) {
 		glfwTerminate();
 #ifdef _WIN32
-		MessageBoxA(NULL, "Failed to create window", "", MB_OK | MB_ICONERROR);
+		MessageBoxA(nullptr, "Failed to create window", "", MB_OK | MB_ICONERROR);
 #else
-		std::cout << "Failed to create window" << std::endl;
+		std::cerr << "Failed to create window" << std::endl;
 #endif // _WIN32
 		return EXIT_FAILURE;
 	}
@@ -115,9 +114,9 @@ int main(void) {
 		glfwDestroyWindow(window);
 		glfwTerminate();
 #ifdef _WIN32
-		MessageBoxA(NULL, "Failed to load glad", "", MB_OK | MB_ICONERROR);
+		MessageBoxA(nullptr, "Failed to load OpenGL", "", MB_OK | MB_ICONERROR);
 #else
-		std::cout << "Failed to load glad" << std::endl;
+		std::cerr << "Failed to load OpenGL" << std::endl;
 #endif // _WIN32
 		return EXIT_FAILURE;
 	}
@@ -375,10 +374,10 @@ int main(void) {
 				if ((size_t)(n - 1) == res::loader::levels.size()) {
 					res::loader::levels.push_back(res::loader::level());
 					res::loader::levels.back().objects.push_back(object(0.0, 0.0, 1, 1,
-						object::enum_orientation::NONE, object::enum_type::NONE, TEX_PHOTON, NULL,
+						object::enum_orientation::NONE, object::enum_type::NONE, TEX_PHOTON, nullptr,
 						(int)photon::enum_direction::E, false));
 					res::loader::levels.back().objects.push_back(object(0.0, 0.0, 640, 360,
-						object::enum_orientation::NONE, object::enum_type::NONE, NULL, NULL, 0, false));
+						object::enum_orientation::NONE, object::enum_type::NONE, nullptr, nullptr, 0, false));
 					res::loader::set_background((int)(res::loader::levels.size() - 1),
 						res::loader::levels.size() - 1 ? res::loader::background().colour : object::default_colour,
 						res::loader::levels.size() - 1 ? res::loader::background().noise : object::default_noise);
@@ -755,10 +754,10 @@ int main(void) {
 				if (c == 'Y') {
 					current->clear();
 					current->push_back(object(0.0, 0.0, 1, 1,
-						object::enum_orientation::NONE, object::enum_type::NONE, TEX_PHOTON, NULL,
+						object::enum_orientation::NONE, object::enum_type::NONE, TEX_PHOTON, nullptr,
 						(int)photon::enum_direction::E, false));
 					current->push_back(object(0.0, 0.0, 640, 360,
-						object::enum_orientation::NONE, object::enum_type::NONE, NULL, NULL, 0, false));
+						object::enum_orientation::NONE, object::enum_type::NONE, nullptr, nullptr, 0, false));
 				}
 				unsaved = true;
 			}
@@ -925,7 +924,7 @@ int main(void) {
 								(GLfloat)res::objects.data()[0].offset,
 								(GLfloat)res::objects.data()[0].offset);
 							glUseProgram(res::shaders::rectangle);
-							glBindVertexArray(res::rect_vao);
+							glBindVertexArray(res::vao);
 							glDrawArrays(GL_TRIANGLES, 0, 6);
 							glBindVertexArray(0);
 							glDisable(GL_SCISSOR_TEST);
@@ -1126,13 +1125,14 @@ bool save_to_file(std::string path) {
 		for (int j = 2; j < res::loader::levels.data()[i].objects.size(); j++) {
 			const object& obj = res::loader::levels.data()[i].objects.data()[j];
 			out << (int)obj.type << ' ' << obj.x << ' ' << obj.y << ' '
+				<< obj.width << ' ' << obj.height << ' '
 				<< (int)obj.orientation << ' ' << (int)obj.randomize;
 			if (obj.type == object::enum_type::MOVING_WALL
 				|| obj.type == object::enum_type::MOVING_BLOCK
 				|| obj.type == object::enum_type::MOVING_CRYSTAL)
 				out << ' ' << obj.x2 << ' ' << obj.y2 << ' ' << obj.data;
 			else if (obj.type == object::enum_type::DOOR || obj.type == object::enum_type::MIRROR_DOOR)
-				out << ' ' << obj.data;
+				out << ' ' << (int)obj.toggle << ' ' << obj.data;
 			out << '\n';
 		}
 	}

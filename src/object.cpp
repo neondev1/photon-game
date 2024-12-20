@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cfloat>
+#include <cstddef>
 
 #include <glad/glad.h>
 
@@ -17,7 +18,7 @@ void render_bars(void) {
 		glUniform1f(glGetUniformLocation(res::shaders::rectangle, "noise"), 0);
 		glUniform1f(glGetUniformLocation(res::shaders::rectangle, "pxsize"), (GLfloat)PX_SIZE);
 		glUseProgram(res::shaders::rectangle);
-		glBindVertexArray(res::rect_vao);
+		glBindVertexArray(res::vao);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 		glBindVertexArray(0);
 		glDisable(GL_SCISSOR_TEST);
@@ -32,20 +33,21 @@ const float object::default_noise = 5.0f;
 object::object(void) :
 	x(0), y(0), _x(0.0), _y(0.0), width(0), height(0),
 	x1(0), y1(0), x2(0), y2(0),
-	offset(0), toggle(false), moving(false), linked(NULL),
+	offset(0), toggle(false), moving(false), linked(nullptr),
 	orientation(enum_orientation::NONE), type(enum_type::NONE),
-	texture(NULL), hitbox(NULL), data(0), randomize(false) {}
+	texture(nullptr), hitbox(nullptr), data(0), randomize(false) {}
 
 object::object(double x, double y, int width, int height, enum_orientation orientation, enum_type type,
 	std::vector<rect>* tex, std::vector<box>* hbox, int data, bool randomize) :
 	x((int)x), y((int)y), _x(x), _y(y), width(width), height(height),
 	x1((int)x), y1((int)y), x2((int)x), y2((int)y),
 	offset(mix32_rand(65536)), toggle(false), moving(false),
-	linked(NULL), orientation(orientation), type(type),
+	linked(nullptr), orientation(orientation), type(type),
 	texture(tex), hitbox(hbox), data(data), randomize(randomize) {}
 
-object* object::selected = NULL;
-object* object::previous = NULL;
+object* object::selected = nullptr;
+object* object::previous = nullptr;
+object* object::reason = nullptr;
 std::unordered_set<object*> object::invalidated;
 bool object::invalidate_all;
 std::list<group> object::groups;
@@ -70,7 +72,7 @@ bool object::overlapping(const object& obj1, const object& obj2) {
 void object::render(int layer, int param) const {
 	if (!on_screen())
 		return;
-	if (!texture) {
+	if (texture == nullptr) {
 		if (layer)
 			return;
 		const rect& quad = res::loader::background();
@@ -85,7 +87,7 @@ void object::render(int layer, int param) const {
 		glUniform2f(glGetUniformLocation(res::shaders::rectangle, "offset"),
 			(GLfloat)offset, (GLfloat)offset);
 		glUseProgram(res::shaders::rectangle);
-		glBindVertexArray(res::rect_vao);
+		glBindVertexArray(res::vao);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 		glBindVertexArray(0);
 		glDisable(GL_SCISSOR_TEST);
@@ -130,7 +132,7 @@ void object::render(int layer, int param) const {
 				glUniform1f(glGetUniformLocation(res::shaders::rectangle, "pxsize"), (GLfloat)PX_SIZE);
 			}
 			glUseProgram(res::shaders::rectangle);
-			glBindVertexArray(res::rect_vao);
+			glBindVertexArray(res::vao);
 			glDrawArrays(GL_TRIANGLES, 0, 6);
 			glBindVertexArray(0);
 			if (layer != -1)
@@ -143,20 +145,20 @@ void object::render(int layer, int param) const {
 	switch (type) {
 	case enum_type::DOOR:
 	case enum_type::MIRROR_DOOR:
-		tex += (uintptr_t)toggle;
+		tex += (ptrdiff_t)toggle;
 		break;
 	case enum_type::MIRROR:
-		tex += (uintptr_t)orientation % 8;
+		tex += (ptrdiff_t)((int)orientation % 8);
 		break;
 	case enum_type::DIAGONAL_MIRROR:
 	case enum_type::SPLITTER:
-		tex += (uintptr_t)(((int)orientation - 2) % 8 == 0 ? 0 : 1);
+		tex += (ptrdiff_t)(((int)orientation - 2) % 8 == 0 ? 0 : 1);
 		break;
 	case enum_type::GLASS_BLOCK:
-		tex += (uintptr_t)((int)orientation % 8 / 2);
+		tex += (ptrdiff_t)((int)orientation % 8 / 2);
 		break;
 	case enum_type::BOMB:
-		tex += (uintptr_t)game::hardcore;
+		tex += (ptrdiff_t)game::hardcore;
 		break;
 	default:
 		break;
@@ -271,7 +273,7 @@ void object::render(int layer, int param) const {
 		glUniform2f(glGetUniformLocation(res::shaders::rectangle, "offset"),
 			(GLfloat)(offset - _x), (GLfloat)(offset - _y));
 		glUseProgram(res::shaders::rectangle);
-		glBindVertexArray(res::rect_vao);
+		glBindVertexArray(res::vao);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 		glBindVertexArray(0);
 		glDisable(GL_BLEND);
@@ -342,7 +344,7 @@ void object::border(bool clear) const {
 		glUniform2f(glGetUniformLocation(res::shaders::rectangle, "offset"),
 			(GLfloat)res::objects.data()[0].offset, (GLfloat)res::objects.data()[0].offset);
 		glUseProgram(res::shaders::rectangle);
-		glBindVertexArray(res::rect_vao);
+		glBindVertexArray(res::vao);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 		glBindVertexArray(0);
 		glDisable(GL_BLEND);
@@ -353,7 +355,7 @@ void object::border(bool clear) const {
 void object::tick(int tps) {
 	int dest_x = toggle ? x2 : x1;
 	int dest_y = toggle ? y2 : y1;
-	if (x == dest_x && dest_y) {
+	if (x == dest_x && y == dest_y) {
 		_x = dest_x;
 		_y = dest_y;
 		moving = false;
@@ -381,7 +383,7 @@ double object::angle() const {
 	tmp = tmp == 4 ? 0 : tmp;
 	double angle = PI * (double)tmp / 2.0;
 	switch ((int)orientation % 4) {
-	case 0: 							break;
+	case 0:                         	break;
 	case 1: angle -= 1.0 * PI / 8.0;	break;
 	case 2: angle -= 2.0 * PI / 8.0;	break;
 	case 3: angle -= 3.0 * PI / 8.0;	break;
@@ -389,19 +391,12 @@ double object::angle() const {
 	return angle;
 }
 
-// group
-
-void group::add(object* obj) {
-	members.push_back(obj);
-	obj->linked = this;
-}
-
 // photon
 
 photon::photon(std::vector<rect>* tex, double x, double y, enum_direction dir, int dc, int split, node* parent) :
-	object(x, y, 4, 4, enum_orientation::NONE, enum_type::NONE, NULL, NULL, 0, false),
-	_tick(0.0), medium(NULL), direction(dir), dc(dc), split(split), parent(parent),
-	interacting(NULL), i_hbox(), i_line(0) {
+	object(x, y, 4, 4, enum_orientation::NONE, enum_type::NONE, nullptr, nullptr, 0, false),
+	_tick(0.0), medium(nullptr), direction(dir), dc(dc), split(split), parent(parent),
+	interacting(nullptr), i_hbox(), i_line(0) {
 	texture = tex;
 	id = count++;
 }
@@ -413,7 +408,7 @@ std::list<node> photon::nodes;
 std::unordered_set<node*> photon::deleting;
 
 void photon::render(void) const {
-	if (texture == NULL || !on_screen() || direction == enum_direction::NONE)
+	if (texture == nullptr || !on_screen() || direction == enum_direction::NONE)
 		return;
 	for (int i = 0; i < texture->size(); i++) {
 		rect quad = texture->data()[i];
@@ -440,7 +435,7 @@ void photon::render(void) const {
 		glUniform1f(glGetUniformLocation(res::shaders::rectangle, "pxsize"), (GLfloat)PX_SIZE);
 		glUniform2f(glGetUniformLocation(res::shaders::rectangle, "offset"), 0.0f, 0.0f);
 		glUseProgram(res::shaders::rectangle);
-		glBindVertexArray(res::rect_vao);
+		glBindVertexArray(res::vao);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 		glBindVertexArray(0);
 		glDisable(GL_BLEND);
@@ -449,27 +444,30 @@ void photon::render(void) const {
 }
 
 void photon::pre_tick(int tps) {
-	object* obj = NULL;
+	object* obj = nullptr;
 	box hitbox;
 	double dist = 0.0, best = 1.5;
 	int line = 0;
 	for (int i = 0; i < res::objects.size(); i++) {
 		std::deque<object*>::iterator iter;
-		if (res::objects.data()[i].type == enum_type::NONE)
+		const object& tmp = res::objects.data()[i];
+		if (tmp.type == enum_type::NONE)
+			continue;
+		else if (tmp.toggle
+			&& (tmp.type == enum_type::DOOR || tmp.type == enum_type::MIRROR_DOOR))
 			continue;
 		else if (interacted.size() != 0
 			&& (iter = std::find(interacted.begin(), interacted.end(), &res::objects.data()[i])) != interacted.end())
 			continue;
-		const object& tmp = res::objects.data()[i];
-		if (tmp.hitbox == NULL) {
+		if (tmp.hitbox == nullptr) {
 			const box hbox = {
 				{-0.5, -0.5, tmp.width + 0.5, tmp.width + 0.5},
 				{-0.5, tmp.height + 0.5, tmp.height + 0.5, -0.5}
 			};
 			for (int p = 0, q = 1; p < 4; p++, q = (p + 1 == 4 ? 0 : p + 1)) {
 				if ((dist = intersect(_x, _y, _x + velx(tps), _y + vely(tps),
-					tmp.x + hbox.x[p], tmp.y + hbox.y[p],
-					tmp.x + hbox.x[q], tmp.y + hbox.y[q]))
+					tmp._x + hbox.x[p], tmp._y + hbox.y[p],
+					tmp._x + hbox.x[q], tmp._y + hbox.y[q]))
 					< best) {
 					obj = &res::objects.data()[i];
 					hitbox = hbox;
@@ -482,20 +480,20 @@ void photon::pre_tick(int tps) {
 			std::vector<box>* rotated = tmp.hitbox;
 			switch (tmp.type) {
 			case enum_type::MIRROR:
-				rotated += (uintptr_t)orientation % 8;
+				rotated += (ptrdiff_t)((int)tmp.orientation % 8);
 				break;
 			case enum_type::DIAGONAL_MIRROR:
 			case enum_type::SPLITTER:
-				rotated += (uintptr_t)(((int)orientation - 2) % 8 == 0 ? 0 : 1);
+				rotated += (ptrdiff_t)(((int)tmp.orientation - 2) % 8 == 0 ? 0 : 1);
 				break;
 			case enum_type::GLASS_BLOCK:
-				rotated += (uintptr_t)((int)orientation % 8 / 2);
+				rotated += (ptrdiff_t)((int)tmp.orientation % 8 / 2);
 				break;
 			default:
 				break;
 			}
-			for (int j = 0; j < tmp.hitbox->size(); j++) {
-				const box& hbox = tmp.hitbox->data()[j];
+			for (int j = 0; j < rotated->size(); j++) {
+				const box& hbox = rotated->data()[j];
 				for (int p = 0, q = 1; p < 4; p++, q = (p + 1 == 4 ? 0 : p + 1)) {
 					if (hbox.x[p] == -DBL_MAX && hbox.y[p] == -DBL_MAX)
 						break;
@@ -548,7 +546,7 @@ void photon::tick(int tps, double len, std::list<photon>::iterator* iter) {
 				immune.push_back(duration);
 			}
 			_tick = 0.0;
-			interacting = NULL;
+			interacting = nullptr;
 		}
 	}
 	++(*iter);

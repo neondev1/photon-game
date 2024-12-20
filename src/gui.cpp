@@ -35,7 +35,7 @@ void gui::load_gui(void) {
 	gui::elements.push_back(new gui::label(100, 100, 1000, true, "PHOTON", fore, 6));
 	gui::elements.push_back(new gui::button(100, 240, 90, 42, true, 10, "PLAY",
 		fore, back, []() {
-		if (game::hardcore && game::failures)
+		if (game::hardcore && game::failures < 0)
 			return;
 		if (game::level >= res::loader::levels.size())
 			return;
@@ -288,7 +288,7 @@ static void draw(int c, int x, int y, int size, vec colour) {
 		case GLFW_KEY_UP:        	tex = &gui::font[4];	break;
 		case GLFW_KEY_LEFT_SHIFT:	tex = &gui::font[5];	break;
 		case GLFW_KEY_RIGHT_SHIFT:	tex = &gui::font[6];	break;
-		case GLFW_KEY_CAPS_LOCK:	tex = &gui::font[6];	break;
+		case GLFW_KEY_CAPS_LOCK:	tex = &gui::font[7];	break;
 		case GLFW_KEY_BACKSPACE:	tex = &gui::font['\b'];	break;
 		case GLFW_KEY_TAB:      	tex = &gui::font['\t'];	break;
 		case GLFW_KEY_ENTER:    	tex = &gui::font['\r'];	break;
@@ -309,7 +309,7 @@ static void draw(int c, int x, int y, int size, vec colour) {
 		glUniform1f(glGetUniformLocation(res::shaders::rectangle, "pxsize"), 0.0f);
 		glUniform2f(glGetUniformLocation(res::shaders::rectangle, "offset"), 0.0f, 0.0f);
 		glUseProgram(res::shaders::rectangle);
-		glBindVertexArray(res::rect_vao);
+		glBindVertexArray(res::vao);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 		glBindVertexArray(0);
 		glDisable(GL_SCISSOR_TEST);
@@ -403,7 +403,7 @@ void gui::panel::render(void) {
 	glUniform1f(glGetUniformLocation(res::shaders::rectangle, "pxsize"), 3.0f);
 	glUniform2f(glGetUniformLocation(res::shaders::rectangle, "offset"), 0.0f, 0.0f);
 	glUseProgram(res::shaders::rectangle);
-	glBindVertexArray(res::rect_vao);
+	glBindVertexArray(res::vao);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 	glBindVertexArray(0);
 	glDisable(GL_BLEND);
@@ -478,7 +478,7 @@ void gui::button::render(void) {
 	glUniform1f(glGetUniformLocation(res::shaders::rectangle, "pxsize"), 0.0f);
 	glUniform2f(glGetUniformLocation(res::shaders::rectangle, "offset"), 0.0f, 0.0f);
 	glUseProgram(res::shaders::rectangle);
-	glBindVertexArray(res::rect_vao);
+	glBindVertexArray(res::vao);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 	glBindVertexArray(0);
 	glDisable(GL_BLEND);
@@ -490,7 +490,7 @@ void gui::button::render(void) {
 
 gui::keybind_button::keybind_button(int x, int y, bool visible, int* key,
 	vec foreground, vec background) :
-	button(x, y, 34, 42, visible, 10, "", foreground, background, NULL),
+	button(x, y, 34, 42, visible, 10, "", foreground, background, nullptr),
 	key(key) {}
 
 void gui::keybind_button::handler(enum_event type, int a, int b, int c) {
@@ -609,11 +609,11 @@ void gui::textbox::handler(enum_event type, int a, int b, int c) {
 		switch (a) {
 		case GLFW_KEY_C:
 			if (c & GLFW_MOD_CONTROL)
-				glfwSetClipboardString(NULL, text.c_str());
+				glfwSetClipboardString(nullptr, text.c_str());
 			break;
 		case GLFW_KEY_V:
 			if (c & GLFW_MOD_CONTROL) {
-				if (const char* str = glfwGetClipboardString(NULL)) {
+				if (const char* str = glfwGetClipboardString(nullptr)) {
 					text.insert(cursor_pos, str);
 					cursor_pos += strlen(str);
 					last_clicked = glfwGetTime();
@@ -622,7 +622,7 @@ void gui::textbox::handler(enum_event type, int a, int b, int c) {
 			break;
 		case GLFW_KEY_X:
 			if (c & GLFW_MOD_CONTROL) {
-				glfwSetClipboardString(NULL, text.c_str());
+				glfwSetClipboardString(nullptr, text.c_str());
 				text.clear();
 			}
 			last_clicked = glfwGetTime();
@@ -697,7 +697,7 @@ void gui::textbox::render(void) {
 	glUniform1f(glGetUniformLocation(res::shaders::rectangle, "pxsize"), 0.0f);
 	glUniform2f(glGetUniformLocation(res::shaders::rectangle, "offset"), 0.0f, 0.0f);
 	glUseProgram(res::shaders::rectangle);
-	glBindVertexArray(res::rect_vao);
+	glBindVertexArray(res::vao);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 	glBindVertexArray(0);
 	glDisable(GL_BLEND);

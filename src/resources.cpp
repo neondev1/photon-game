@@ -2,12 +2,11 @@
 
 namespace res {
 	std::vector<object> objects;
-	GLuint rect_vao = 0;
+	GLuint vao = 0;
+	GLuint shaders::rectangle = 0;
+}
 
-	namespace shaders {
-		GLuint rectangle;
-
-		const char* vertex = R"(
+const char* res::shaders::vertex = R"(
 #version 330 core
 layout (location = 0) in vec3 pos;
 void main() {
@@ -15,7 +14,7 @@ void main() {
 }
 )""\0";
 
-		const char* fragment = R"(
+const char* res::shaders::fragment = R"(
 #version 330 core
 out vec4 outcolour;
 uniform vec4 colour;
@@ -50,8 +49,6 @@ void main() {
 	}
 }
 )""\0";
-	}
-}
 
 void res::load_vao(void) {
 	const GLfloat quad[] = {
@@ -63,13 +60,13 @@ void res::load_vao(void) {
 		 1.0f, -1.0f
 	};
 	GLuint vbo = 0;
-	glGenVertexArrays(1, &rect_vao);
+	glGenVertexArrays(1, &vao);
 	glGenBuffers(1, &vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, vbo);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
-	glBindVertexArray(rect_vao);
+	glBindVertexArray(vao);
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), NULL);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), nullptr);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
 }
@@ -77,14 +74,14 @@ void res::load_vao(void) {
 void res::shaders::load(void) {
 	rectangle = glCreateProgram();
 	GLuint vert = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vert, 1, &vertex, NULL);
+	glShaderSource(vert, 1, &vertex, nullptr);
 	glCompileShader(vert);
 	GLuint frag = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(frag, 1, &fragment, NULL);
+	glShaderSource(frag, 1, &fragment, nullptr);
 	glCompileShader(frag);
 #ifdef _DEBUG
 	char log[1024];
-	glGetShaderInfoLog(frag, 1024, NULL, log);
+	glGetShaderInfoLog(frag, 1024, nullptr, log);
 	printf("%s", log);
 #endif
 	glAttachShader(rectangle, vert);
@@ -308,6 +305,7 @@ void res::loader::load_tex(void) {
 	for (int i = 0; i < 18; i++)
 		textures[14].push_back({ 18 - i, 1 + i, 1, 1, vec(0.9f, 0.95f, 1.0f, 1.0f), 0.0f, 5 });
 	// MIRROR_BLOCK
+	colour = vec(0.8f, 0.95f, 1.0f, 1.0f);
 	textures[15].push_back({ 0, 0, 20, 20, vec(0.5f, 0.95f, 1.0f, 1.0f), 4.0f, 3 });
 	textures[15].push_back({ 1, 1, 18, 18, vec(0.7f, 0.95f, 1.0f, 1.0f), 4.0f, 3 });
 	for (int i = 0; i < 9; i++)
@@ -608,27 +606,32 @@ void res::loader::load_hbx(void) {
 		{ 0.0, 0.0, 20.0, 20.0 },
 		{ 7.5, 12.5, 12.5, 7.5 }
 	});
+	hitboxes[1].push_back({ {0.0}, {0.0} });
+	hitboxes[2].push_back({ {0.0}, {0.0} });
+	hitboxes[3].push_back({ {0.0}, {0.0} });
 	hitboxes[4].push_back({
 		{ 7.5, 7.5, 12.5, 12.5 },
 		{ 0.0, 20.0, 20.0, 0.0 }
 	});
-	hitboxes[1].push_back({{0.0}, {0.0}});
-	hitboxes[2].push_back({{0.0}, {0.0}});
-	hitboxes[3].push_back({{0.0}, {0.0}});
 	hitboxes[5].push_back({{0.0}, {0.0}});
 	hitboxes[6].push_back({{0.0}, {0.0}});
 	hitboxes[7].push_back({{0.0}, {0.0}});
-	for (int i = 1; i < 8; i++) {
-		if (i == 4)
-			continue;
-		double angle = i * PI / 8;
+	for (int i = 1; i < 4; i++) {
+		double angle = PI * (4.0 - i) / 8.0;
+		// Rotate clockwise to preserve correct orientation of points
 		for (int j = 0; j < 4; j++) {
 			hitboxes[i][0].x[j] = 10.0
-				+ (hitboxes[0][0].x[j] - 10.0) * std::cos(angle)
-				- (hitboxes[0][0].x[j] - 10.0) * std::sin(angle);
+				+ (hitboxes[4][0].x[j] - 10.0) * std::cos(angle)
+				+ (hitboxes[4][0].y[j] - 10.0) * std::sin(angle);
 			hitboxes[i][0].y[j] = 10.0
-				+ (hitboxes[0][0].x[j] - 10.0) * std::sin(angle)
-				+ (hitboxes[0][0].x[j] - 10.0) * std::cos(angle);
+				- (hitboxes[4][0].x[j] - 10.0) * std::sin(angle)
+				+ (hitboxes[4][0].y[j] - 10.0) * std::cos(angle);
+			hitboxes[i + 4][0].x[j] = 10.0
+				+ (hitboxes[0][0].x[j] - 10.0) * std::cos(angle)
+				+ (hitboxes[0][0].y[j] - 10.0) * std::sin(angle);
+			hitboxes[i + 4][0].y[j] = 10.0
+				- (hitboxes[0][0].x[j] - 10.0) * std::sin(angle)
+				+ (hitboxes[0][0].y[j] - 10.0) * std::cos(angle);
 		}
 	}
 	// DIAGONAL_MIRROR
@@ -654,13 +657,13 @@ void res::loader::load_hbx(void) {
 	const double sqrt2 = std::sqrt(2);
 	for (int i = 0; i < 4; i++) {
 		hitboxes[11][0].x[i] = 10.0
-			+ ((hitboxes[10][0].x[i] - 10.0) - (hitboxes[10][0].x[i] - 10.0)) / sqrt2;
+			+ ( (hitboxes[12][0].x[i] - 10.0) + (hitboxes[10][0].y[i] - 10.0)) / sqrt2;
 		hitboxes[11][0].y[i] = 10.0
-			+ ((hitboxes[10][0].x[i] - 10.0) + (hitboxes[10][0].x[i] - 10.0)) / sqrt2;
+			+ (-(hitboxes[12][0].x[i] - 10.0) + (hitboxes[10][0].y[i] - 10.0)) / sqrt2;
 		hitboxes[13][0].x[i] = 10.0
-			+ ((hitboxes[12][0].x[i] - 10.0) - (hitboxes[12][0].x[i] - 10.0)) / sqrt2;
+			+ ( (hitboxes[10][0].x[i] - 10.0) + (hitboxes[12][0].y[i] - 10.0)) / sqrt2;
 		hitboxes[13][0].y[i] = 10.0
-			+ ((hitboxes[12][0].x[i] - 10.0) + (hitboxes[12][0].x[i] - 10.0)) / sqrt2;
+			+ (-(hitboxes[10][0].x[i] - 10.0) + (hitboxes[12][0].y[i] - 10.0)) / sqrt2;
 	}
 	// PRISM
 	hitboxes[14].push_back({
